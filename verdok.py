@@ -2,6 +2,8 @@ import streamlit as st
 import openai
 import os
 import pandas as pd
+from openai import OpenAI
+
 
 # Ambil API key dari secret
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -40,14 +42,19 @@ def analisis_dokumen(teks):
     Dokumen:
     {teks}
     """
-
-    response = openai.ChatCompletion.create(
+def analisis_dokumen(teks):
+    prompt = f"""
+    Lakukan analisis dokumen berikut sesuai format yang diminta:
+    {teks}
+    """
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}],
+        messages=[
+            {"role": "user", "content": prompt}
+        ],
         temperature=0
     )
-
-    return response.choices[0].message["content"]
+    return response.choices[0].message.content
 
 # Jika file diupload
 if uploaded_file:
