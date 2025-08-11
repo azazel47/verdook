@@ -107,7 +107,7 @@ if st.button("🔍 Proses Analisis"):
 
         # Hitung total & rata-rata
         total_skor = sum(skor_list)
-        rata_skor = total_skor / len(skor_list)
+        
 
         st.subheader("📊 Hasil Analisis Per Dokumen")
         for nama, konten in hasil_semua.items():
