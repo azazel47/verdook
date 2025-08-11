@@ -3,7 +3,7 @@ import openai
 import fitz  # PyMuPDF
 import pandas as pd
 import re
-
+from openai import OpenAI
 # --- Konfigurasi API ---
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
@@ -66,12 +66,18 @@ def analisis_dokumen(teks, syarat):
     Dokumen:
     {teks}
     """
-    response = openai.ChatCompletion.create(
-        model="gpt-4",  # Sesuai SDK lama
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0
-    )
-    return response.choices[0].message["content"]
+
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
+response = client.chat.completions.create(
+    model="gpt-4o-mini",  # atau model lain
+    messages=[
+        {"role": "user", "content": prompt}
+    ],
+    temperature=0
+)
+
+hasil = response.choices[0].message.content
 
 # --- UI ---
 st.title("📄 Verifikasi Kelengkapan Dokumen")
