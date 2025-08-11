@@ -73,7 +73,9 @@ def analisis_dokumen(teks, syarat):
     )
     return response.choices[0].message.content
 
-hasil = response.choices[0].message.content
+hasil = analisis_dokumen("isi teks pdf", "isi persyaratan")
+print(hasil)
+
 
 # --- UI ---
 st.title("📄 Verifikasi Kelengkapan Dokumen")
