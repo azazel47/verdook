@@ -54,7 +54,7 @@ def baca_pdf(uploaded_file):
         teks += page.get_text()
     return teks
 
-# --- Fungsi Analisis dengan Retry ---
+# --- Fungsi Analisis dengan Retry (exponential backoff + jitter) ---
 def analisis_dokumen(teks, syarat, max_retries=5):
     prompt = f"""
     Periksa dokumen berikut terhadap persyaratan ini:
@@ -78,17 +78,17 @@ def analisis_dokumen(teks, syarat, max_retries=5):
             return response.choices[0].message.content
 
         except RateLimitError:
-            wait_time = (attempt + 1) * 3 + random.uniform(0, 2)
-            st.warning(f"[RateLimit] Menunggu {wait_time:.1f} detik sebelum retry...")
+            wait_time = (2 ** attempt) + random.uniform(0, 2)
+            st.warning(f"[RateLimit] Menunggu {wait_time:.1f} detik sebelum retry (percobaan {attempt+1}/{max_retries})...")
             time.sleep(wait_time)
 
         except (APIError, APIConnectionError) as e:
-            wait_time = (attempt + 1) * 2
-            st.warning(f"[API Error] {e}. Retry dalam {wait_time} detik...")
+            wait_time = (2 ** attempt) + 1
+            st.warning(f"[API Error] {e}. Retry dalam {wait_time:.1f} detik...")
             time.sleep(wait_time)
 
         except Exception as e:
-            st.error(f"[Error] {e}")
+            st.error(f"[Error Tidak Terduga] {e}")
             break
 
     return "[Gagal menganalisis dokumen]"
@@ -121,14 +121,17 @@ if st.button("🔍 Proses Analisis"):
                 hasil = analisis_dokumen(teks, persyaratan[nama])
                 hasil_semua[nama] = hasil
 
-                # Ekstraksi skor dari hasil
+                # Ekstraksi skor dari hasil (jika ada)
                 match = re.search(r"Skor\s*[:\-]?\s*(\d+)", hasil)
                 if match:
-                    skor_list.append(int(match.group(1)))
+                    try:
+                        skor_list.append(int(match.group(1)))
+                    except ValueError:
+                        pass
 
-                time.sleep(1.5)  # jeda antar dokumen
+                time.sleep(1.5)  # jeda kecil antar dokumen
 
-        # Hitung total & rata-rata dengan aman
+        # Hitung total & rata-rata
         total_skor = sum(skor_list)
         rata_skor = total_skor / len(skor_list) if skor_list else 0
 
