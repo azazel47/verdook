@@ -1,11 +1,7 @@
 import streamlit as st
 from openai import OpenAI
-from openai.error import RateLimitError, APIError, APIConnectionError, ServiceUnavailableError
 import fitz  # PyMuPDF
 import pandas as pd
-import time
-import random
-import re
 
 # --- Konfigurasi API ---
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
@@ -50,16 +46,13 @@ persyaratan = {
 # --- Fungsi Baca PDF ---
 def baca_pdf(uploaded_file):
     teks = ""
-    try:
-        doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
-        for page in doc:
-            teks += page.get_text()
-    except Exception as e:
-        st.error(f"[Gagal Membaca PDF] {e}")
+    doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+    for page in doc:
+        teks += page.get_text()
     return teks
 
-# --- Fungsi Panggil API dengan Retry (Exponential Backoff + Jitter) ---
-def analisis_dokumen(teks, syarat, max_retries=6):
+# --- Fungsi Analisis ---
+def analisis_dokumen(teks, syarat):
     prompt = f"""
     Periksa dokumen berikut terhadap persyaratan ini:
     {syarat}
@@ -72,30 +65,12 @@ def analisis_dokumen(teks, syarat, max_retries=6):
     Dokumen:
     {teks}
     """
-    for attempt in range(max_retries):
-        try:
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0
-            )
-            return response.choices[0].message.content
-
-        except (RateLimitError, ServiceUnavailableError):
-            wait_time = min(60, (2 ** attempt) + random.uniform(0, 2))
-            st.warning(f"[RateLimit] Menunggu {wait_time:.1f} detik sebelum retry ({attempt+1}/{max_retries})...")
-            time.sleep(wait_time)
-
-        except (APIError, APIConnectionError) as e:
-            wait_time = (2 ** attempt) + 1
-            st.warning(f"[API Error] {e}. Retry dalam {wait_time:.1f} detik...")
-            time.sleep(wait_time)
-
-        except Exception as e:
-            st.error(f"[Error Tidak Terduga] {e}")
-            break
-
-    return "[Gagal menganalisis dokumen]"
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0
+    )
+    return response.choices[0].message.content
 
 # --- UI ---
 st.title("📄 Verifikasi Kelengkapan Dokumen")
@@ -115,34 +90,24 @@ if st.button("🔍 Proses Analisis"):
     else:
         hasil_semua = {}
         skor_list = []
-        df_hasil = []
 
-        dok_list = [dok1, dok2, dok3, dok4] if is_reklamasi else [dok1, dok2, dok3]
-        nama_list = ["dok1", "dok2", "dok3", "dok4"] if is_reklamasi else ["dok1", "dok2", "dok3"]
-
-        for dok, nama in zip(dok_list, nama_list):
+        for idx, (dok, nama) in enumerate(zip(
+            [dok1, dok2, dok3, dok4] if is_reklamasi else [dok1, dok2, dok3],
+            ["dok1", "dok2", "dok3", "dok4"] if is_reklamasi else ["dok1", "dok2", "dok3"]
+        )):
             if dok:
-                st.info(f"📄 Memproses {nama.upper()} ...")
                 teks = baca_pdf(dok)
                 hasil = analisis_dokumen(teks, persyaratan[nama])
                 hasil_semua[nama] = hasil
-
-                # Ekstraksi skor
+                # Ekstraksi skor dari teks hasil
+                import re
                 match = re.search(r"Skor\s*[:\-]?\s*(\d+)", hasil)
-                skor = int(match.group(1)) if match else 0
-                skor_list.append(skor)
+                if match:
+                    skor_list.append(int(match.group(1)))
 
-                df_hasil.append({
-                    "Dokumen": nama.upper(),
-                    "Skor": skor,
-                    "Hasil Analisis": hasil
-                })
-
-                time.sleep(1.5)  # jeda kecil antar dokumen
-
-        # Rekap skor
+        # Hitung total & rata-rata
         total_skor = sum(skor_list)
-        rata_skor = total_skor / len(skor_list) if skor_list else 0
+        rata_skor = total_skor / len(skor_list)
 
         st.subheader("📊 Hasil Analisis Per Dokumen")
         for nama, konten in hasil_semua.items():
@@ -156,7 +121,3 @@ if st.button("🔍 Proses Analisis"):
             st.success("✅ Lolos Verifikasi")
         else:
             st.error("❌ Tidak Lolos Verifikasi")
-
-        # Tampilkan tabel
-        st.subheader("📄 Tabel Rekap")
-        st.dataframe(pd.DataFrame(df_hasil))
