@@ -44,6 +44,7 @@ masyarakat sekitar); dan
     - Berikan skor 0-100 untuk setiap poin.
     - Buat tabel checklist berwarna: hijau (lengkap), kuning (kurang lengkap), merah (tidak ada).
     - Berikan ringkasan hasil analisis di akhir.
+    - Pada data ekosistem, jika dilokasi tidak terdapat magnrove/lamun/terumbu karang skors tetap hijau jika dijelaskan dalam narasi tidak ada. Namun jika tidak ada keterangan apapun maka merah
 
     Dokumen:
     {teks}
