@@ -1,17 +1,15 @@
 # Streamlit prototype: Document Verification for Licensing Documents with AI
-# File: streamlit_document_verification_app.py
-# Description: Web app for verifying licensing documents based on specified requirements.
-# Supports PDF, DOCX, TXT, and image files.
+# Updated: Removed pdfminer dependency for easier deployment on Streamlit Cloud.
 
 import streamlit as st
 from io import BytesIO
 import tempfile
 import os
 import re
-from pdfminer.high_level import extract_text as extract_text_from_pdf
 from docx import Document
 from PIL import Image
 import pytesseract
+from PyPDF2 import PdfReader
 
 st.set_page_config(page_title="Verifikasi Dokumen Perizinan", layout="wide")
 
@@ -30,7 +28,12 @@ def extract_text(file_bytes: bytes, filename: str) -> str:
     lower = filename.lower()
     text = ""
     if lower.endswith('.pdf'):
-        text = extract_text_from_pdf(BytesIO(file_bytes))
+        try:
+            reader = PdfReader(BytesIO(file_bytes))
+            for page in reader.pages:
+                text += page.extract_text() or ""
+        except Exception as e:
+            st.error(f"Gagal mengekstrak teks PDF: {e}")
     elif lower.endswith('.docx'):
         with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp:
             tmp.write(file_bytes)
