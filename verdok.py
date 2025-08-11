@@ -1,13 +1,13 @@
 import streamlit as st
-from openai import OpenAI
 import fitz  # PyMuPDF
 import pandas as pd
 import time
 import random
 import re
-import openai
+
 from openai import OpenAI
-from openai import APIError, APIConnectionError, RateLimitError, ServiceUnavailableError
+from openai.error import APIError, APIConnectionError, RateLimitError, ServiceUnavailableError
+
 
 # --- Konfigurasi API ---
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
