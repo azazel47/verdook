@@ -1,5 +1,5 @@
 import streamlit as st
-from openai import OpenAI
+import openai
 from openai.error import RateLimitError, APIError, APIConnectionError, ServiceUnavailableError
 import fitz  # PyMuPDF
 import pandas as pd
@@ -8,7 +8,7 @@ import random
 import re
 
 # --- Konfigurasi API ---
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 # --- Persyaratan ---
 persyaratan = {
@@ -74,12 +74,12 @@ def analisis_dokumen(teks, syarat, max_retries=6):
     """
     for attempt in range(max_retries):
         try:
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0
             )
-            return response.choices[0].message.content
+            return response.choices[0].message["content"]
 
         except (RateLimitError, ServiceUnavailableError):
             wait_time = min(60, (2 ** attempt) + random.uniform(0, 2))
