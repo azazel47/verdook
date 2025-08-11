@@ -1,10 +1,14 @@
 import streamlit as st
+from openai import OpenAI
+from openai.error import RateLimitError, APIError, APIConnectionError, ServiceUnavailableError
 import fitz  # PyMuPDF
+import pandas as pd
+import time
+import random
 import re
-import google.generativeai as genai
 
 # --- Konfigurasi API ---
-genai.configure(api_key=st.secrets["OPENAI_API_KEY"])
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # --- Persyaratan ---
 persyaratan = {
@@ -46,13 +50,16 @@ persyaratan = {
 # --- Fungsi Baca PDF ---
 def baca_pdf(uploaded_file):
     teks = ""
-    doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
-    for page in doc:
-        teks += page.get_text()
+    try:
+        doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+        for page in doc:
+            teks += page.get_text()
+    except Exception as e:
+        st.error(f"[Gagal Membaca PDF] {e}")
     return teks
 
-# --- Fungsi Analisis dengan Gemini ---
-def analisis_dokumen(teks, syarat):
+# --- Fungsi Panggil API dengan Retry (Exponential Backoff + Jitter) ---
+def analisis_dokumen(teks, syarat, max_retries=6):
     prompt = f"""
     Periksa dokumen berikut terhadap persyaratan ini:
     {syarat}
@@ -65,21 +72,35 @@ def analisis_dokumen(teks, syarat):
     Dokumen:
     {teks}
     """
-    model = genai.GenerativeModel("gemini-1.5-pro")
-    try:
-        response = model.generate_content([prompt])
+    for attempt in range(max_retries):
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0
+            )
+            return response.choices[0].message.content
 
-        if response.candidates and response.candidates[0].content.parts:
-            return response.candidates[0].content.parts[0].text
-        else:
-            return "⚠️ Tidak ada hasil dari Gemini."
-    except Exception as e:
-        return f"❌ Error saat memanggil Gemini API: {e}"
+        except (RateLimitError, ServiceUnavailableError):
+            wait_time = min(60, (2 ** attempt) + random.uniform(0, 2))
+            st.warning(f"[RateLimit] Menunggu {wait_time:.1f} detik sebelum retry ({attempt+1}/{max_retries})...")
+            time.sleep(wait_time)
+
+        except (APIError, APIConnectionError) as e:
+            wait_time = (2 ** attempt) + 1
+            st.warning(f"[API Error] {e}. Retry dalam {wait_time:.1f} detik...")
+            time.sleep(wait_time)
+
+        except Exception as e:
+            st.error(f"[Error Tidak Terduga] {e}")
+            break
+
+    return "[Gagal menganalisis dokumen]"
 
 # --- UI ---
-st.title("📄 Verifikasi Kelengkapan Dokumen (Gemini AI)")
+st.title("📄 Verifikasi Kelengkapan Dokumen")
 
-is_reklamasi = st.checkbox("Reklamasi (Dokumen 4 jika ada)")
+is_reklamasi = st.checkbox("Reklamasi (Dokumen 4 wajib diunggah)")
 
 dok1 = st.file_uploader("📄 Upload Dokumen 1", type=["pdf"])
 dok2 = st.file_uploader("📄 Upload Dokumen 2", type=["pdf"])
@@ -89,47 +110,53 @@ if is_reklamasi:
     dok4 = st.file_uploader("📄 Upload Dokumen 4", type=["pdf"])
 
 if st.button("🔍 Proses Analisis"):
-    hasil_semua = {}
-    skor_list = []
+    if not dok1 or not dok2 or not dok3 or (is_reklamasi and not dok4):
+        st.error("⚠️ Semua dokumen wajib diunggah sesuai ketentuan!")
+    else:
+        hasil_semua = {}
+        skor_list = []
+        df_hasil = []
 
-    dokumen_input = [
-        (dok1, "dok1"),
-        (dok2, "dok2"),
-        (dok3, "dok3")
-    ]
-    if is_reklamasi:
-        dokumen_input.append((dok4, "dok4"))
+        dok_list = [dok1, dok2, dok3, dok4] if is_reklamasi else [dok1, dok2, dok3]
+        nama_list = ["dok1", "dok2", "dok3", "dok4"] if is_reklamasi else ["dok1", "dok2", "dok3"]
 
-    for dok, nama in dokumen_input:
-        if dok:
-            teks = baca_pdf(dok)
-            hasil = analisis_dokumen(teks, persyaratan[nama])
-            hasil_semua[nama] = hasil
+        for dok, nama in zip(dok_list, nama_list):
+            if dok:
+                st.info(f"📄 Memproses {nama.upper()} ...")
+                teks = baca_pdf(dok)
+                hasil = analisis_dokumen(teks, persyaratan[nama])
+                hasil_semua[nama] = hasil
 
-            match = re.search(r"Skor\s*[:\-]?\s*(\d+)", hasil)
-            if match:
-                skor_list.append(int(match.group(1)))
-        else:
-            hasil_semua[nama] = "⚠️ Dokumen tidak diunggah, analisis dilewati."
+                # Ekstraksi skor
+                match = re.search(r"Skor\s*[:\-]?\s*(\d+)", hasil)
+                skor = int(match.group(1)) if match else 0
+                skor_list.append(skor)
 
-    # Hitung skor
-    total_skor = sum(skor_list) if skor_list else 0
-    rata_skor = (total_skor / len(skor_list)) if skor_list else 0
+                df_hasil.append({
+                    "Dokumen": nama.upper(),
+                    "Skor": skor,
+                    "Hasil Analisis": hasil
+                })
 
-    # Tampilkan hasil
-    st.subheader("📊 Hasil Analisis Per Dokumen")
-    for nama, konten in hasil_semua.items():
-        st.markdown(f"**{nama.upper()}**")
-        st.markdown(konten)
+                time.sleep(1.5)  # jeda kecil antar dokumen
 
-    st.subheader("📈 Rekapitulasi Skor")
-    st.write(f"Total Skor: {total_skor}")
-    st.write(f"Rata-rata Skor: {rata_skor:.2f}")
+        # Rekap skor
+        total_skor = sum(skor_list)
+        rata_skor = total_skor / len(skor_list) if skor_list else 0
 
-    if skor_list:
+        st.subheader("📊 Hasil Analisis Per Dokumen")
+        for nama, konten in hasil_semua.items():
+            st.markdown(f"**{nama.upper()}**")
+            st.markdown(konten)
+
+        st.subheader("📈 Rekapitulasi Skor")
+        st.write(f"Total Skor: {total_skor}")
+        st.write(f"Rata-rata Skor: {rata_skor:.2f}")
         if rata_skor >= 70:
             st.success("✅ Lolos Verifikasi")
         else:
             st.error("❌ Tidak Lolos Verifikasi")
-    else:
-        st.warning("⚠️ Tidak ada dokumen yang bisa dianalisis.")
+
+        # Tampilkan tabel
+        st.subheader("📄 Tabel Rekap")
+        st.dataframe(pd.DataFrame(df_hasil))
