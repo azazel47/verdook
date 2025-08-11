@@ -1,67 +1,92 @@
-import streamlit as st
 import os
+import streamlit as st
+import tempfile
 from openai import OpenAI
+from PyPDF2 import PdfReader
 import docx
-import fitz  # PyMuPDF untuk PDF
 
-# Inisialisasi client OpenAI dengan API Key dari Secret Streamlit
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Ambil API key dari Streamlit secrets atau environment variable
+api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
+if not api_key:
+    st.error("API Key OpenAI belum diatur. Tambahkan di Secrets atau Environment.")
+    st.stop()
 
-# Fungsi ekstrak teks dari file
-def extract_text(file):
+client = OpenAI(api_key=api_key)
+
+# Daftar ketentuan pemeriksaan
+KETENTUAN = """
+Periksa dokumen ini apakah memuat informasi berikut secara lengkap:
+
+1) Ekosistem sekitar:
+   i. Mangrove (narasi, peta/gambar, sumber data):
+      - Jenis
+      - Persentase penutupan
+      - Luasan
+   ii. Lamun (narasi, peta/gambar, sumber data):
+      - Jenis
+      - Persentase penutupan padang lamun kaya/sehat
+      - Luasan
+   iii. Terumbu Karang (narasi, peta/gambar, sumber data):
+      - Jenis terumbu karang
+      - Persentase tutupan karang hidup
+      - Luasan
+
+2) Permodelan data hidro-oseanografi:
+   i. Arus (narasi, peta/gambar, sumber data, tipe arus: pasang surut campuran harian ganda atau lainnya)
+   ii. Gelombang (narasi, peta/gambar, sumber data)
+   iii. Pasang surut (narasi, peta/gambar, sumber data)
+   iv. Batimetri (narasi, peta/gambar, sumber data)
+
+3) Profil dasar laut (narasi: berlumpur/berbatu/dll, gambar dokumentasi dasar laut atau penampang melintang)
+4) Kondisi/karakteristik sosial ekonomi masyarakat (mata pencaharian masyarakat sekitar)
+5) Aksesibilitas lokasi dan sekitar
+
+Berikan hasil dalam format checklist lengkap dan catatan kekurangan jika ada.
+"""
+
+# Fungsi membaca file
+def baca_file(uploaded_file):
+    ext = uploaded_file.name.split(".")[-1].lower()
     text = ""
-    if file.name.endswith(".txt"):
-        text = file.read().decode("utf-8")
-    elif file.name.endswith(".docx"):
-        doc = docx.Document(file)
-        text = "\n".join([para.text for para in doc.paragraphs])
-    elif file.name.endswith(".pdf"):
-        pdf = fitz.open(stream=file.read(), filetype="pdf")
-        for page in pdf:
-            text += page.get_text()
+    if ext == "pdf":
+        reader = PdfReader(uploaded_file)
+        for page in reader.pages:
+            text += page.extract_text() + "\n"
+    elif ext in ["docx", "doc"]:
+        doc = docx.Document(uploaded_file)
+        for para in doc.paragraphs:
+            text += para.text + "\n"
+    elif ext in ["txt", "md"]:
+        text = uploaded_file.read().decode("utf-8")
+    else:
+        st.error("Format file tidak didukung. Gunakan PDF, DOCX, atau TXT.")
     return text.strip()
 
-# Fungsi analisis AI
-def analisis_dokumen(text):
-    kriteria = """
-Periksa apakah dokumen ini memenuhi semua poin berikut:
+# UI
+st.title("📄 Verifikasi Kelengkapan Dokumen - Ekosistem & Hidro-Oseanografi")
 
-1) Rencana kegiatan:
-   i. Dokumen dasar: kegiatan, tujuan, dan manfaat usaha.
-   ii. Kegiatan eksisting yang dimohonkan.
-   iii. Rencana jadwal pelaksanaan kegiatan utama & pendukung.
-   iv. Rencana tapak/site plan dengan bangunan, instalasi di laut, & fasilitas penunjang.
-   v. Luasan (Ha) per kegiatan utama & penunjang.
+uploaded_file = st.file_uploader("Unggah dokumen (PDF/DOCX/TXT)", type=["pdf", "docx", "doc", "txt"])
 
-2) Peta lokasi / plotting batas area dengan koordinat lintang & bujur.
+if uploaded_file:
+    st.info("📥 Membaca dokumen...")
+    dokumen_text = baca_file(uploaded_file)
 
-Buat ringkasan apakah tiap poin tersebut ADA atau TIDAK ADA, dan berikan saran jika kurang.
-"""
-    prompt = f"Teks dokumen:\n{text}\n\n{kriteria}"
+    if dokumen_text:
+        with st.spinner("🔍 Memeriksa kelengkapan dokumen..."):
+            prompt = f"Dokumen:\n{dokumen_text}\n\n{KETENTUAN}"
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "Anda adalah asisten yang memeriksa kelengkapan dokumen teknis secara detail."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0
+            )
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "Anda adalah asisten yang memeriksa kelengkapan dokumen teknis."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0
-    )
+            hasil = response.choices[0].message.content
+            st.success("✅ Pemeriksaan selesai")
+            st.markdown("### Hasil Pemeriksaan:")
+            st.markdown(hasil)
 
-    return response.choices[0].message.content
-
-# UI Streamlit
-st.title("📄 Verifikasi Kelengkapan Dokumen")
-
-uploaded_file = st.file_uploader("Unggah dokumen (PDF, DOCX, TXT)", type=["pdf", "docx", "txt"])
-
-if uploaded_file is not None:
-    with st.spinner("📄 Membaca dokumen..."):
-        teks_dokumen = extract_text(uploaded_file)
-
-    if teks_dokumen:
-        st.subheader("📑 Hasil Analisis AI")
-        hasil = analisis_dokumen(teks_dokumen)
-        st.write(hasil)
     else:
-        st.error("Tidak ada teks yang bisa diekstrak dari dokumen.")
+        st.error("Gagal membaca isi dokumen.")
