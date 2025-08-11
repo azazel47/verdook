@@ -67,11 +67,12 @@ def analisis_dokumen(teks, syarat):
     {teks}
     """
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # atau model lain
+        model="gpt-4o-mini",  
         messages=[{"role": "user", "content": prompt}],
         temperature=0
     )
-    return response.choices[0].message.content
+# return langsung hasil teks
+return response.choices[0].message.content
 
 hasil = analisis_dokumen("isi teks pdf", "isi persyaratan")
 print(hasil)
