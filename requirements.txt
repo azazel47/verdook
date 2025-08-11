@@ -3,5 +3,6 @@ PyPDF2
 python-docx
 pandas
 pytesseract
-import openai
-import io
+openai
+io
+
