@@ -66,16 +66,12 @@ def analisis_dokumen(teks, syarat):
     Dokumen:
     {teks}
     """
-
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-
-response = client.chat.completions.create(
-    model="gpt-4o-mini",  # atau model lain
-    messages=[
-        {"role": "user", "content": prompt}
-    ],
-    temperature=0
-)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # atau model lain
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0
+    )
+    return response.choices[0].message.content
 
 hasil = response.choices[0].message.content
 
