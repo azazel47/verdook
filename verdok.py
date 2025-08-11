@@ -4,7 +4,7 @@ import re
 import google.generativeai as genai
 
 # --- Konfigurasi API Gemini ---
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+genai.configure(api_key=st.secrets["OPENAI_API_KEY"])
 
 # --- Persyaratan (sama seperti sebelumnya) ---
 persyaratan = {
