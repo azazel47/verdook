@@ -3,4 +3,5 @@ streamlit>=1.36.0
 PyMuPDF
 pandas
 tenacity
+google-generativeai
 
