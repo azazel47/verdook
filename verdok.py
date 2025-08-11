@@ -4,54 +4,10 @@ from docx import Document
 import openai
 import io
 
-
 import streamlit as st
-import openai
-import sys
 
-# --- Cek API Key ---
-if "OPENAI_API_KEY" not in st.secrets:
-    st.error("""
-    ❌ **API Key tidak ditemukan!**
-    - Pastikan sudah menambahkan `OPENAI_API_KEY` di **Streamlit Secrets**.
-    - Format di secrets manager harus seperti ini:
-      ```
-      OPENAI_API_KEY = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-      ```
-    - Simpan, lalu deploy ulang aplikasi.
-    """)
-    st.stop()  # hentikan eksekusi aplikasi
+st.write("OPENAI_API_KEY" in st.secrets)  # Harus True
 
-# Set API Key
-openai.api_key = st.secrets["OPENAI_API_KEY"]
-
-st.title("🔍 Verifikasi Dokumen dengan AI")
-
-uploaded_file = st.file_uploader("Upload dokumen (.txt)", type=["txt"])
-
-if uploaded_file is not None:
-    text = uploaded_file.read().decode("utf-8")
-
-    st.subheader("Isi Dokumen")
-    st.write(text)
-
-    if st.button("Analisis dengan AI"):
-        with st.spinner("Sedang menganalisis..."):
-            try:
-                response = openai.ChatCompletion.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {"role": "system", "content": "Kamu adalah asisten yang ahli menganalisis dokumen."},
-                        {"role": "user", "content": f"Analisis dokumen berikut dan jelaskan isinya:\n\n{text}"}
-                    ],
-                    max_tokens=500
-                )
-                analysis = response["choices"][0]["message"]["content"]
-                st.subheader("Hasil Analisis AI")
-                st.write(analysis)
-
-            except Exception as e:
-                st.error(f"Terjadi kesalahan: {e}")
 
 # ===== KONFIGURASI OPENAI API =====
 # Pastikan tambahkan OPENAI_API_KEY di Secrets Streamlit
