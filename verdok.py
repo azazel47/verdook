@@ -1,5 +1,6 @@
 import streamlit as st
-from openai import OpenAI, RateLimitError, APIError, APIConnectionError
+from openai import OpenAI
+from openai.error import RateLimitError, APIError, APIConnectionError, ServiceUnavailableError
 import fitz  # PyMuPDF
 import pandas as pd
 import time
@@ -49,13 +50,16 @@ persyaratan = {
 # --- Fungsi Baca PDF ---
 def baca_pdf(uploaded_file):
     teks = ""
-    doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
-    for page in doc:
-        teks += page.get_text()
+    try:
+        doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+        for page in doc:
+            teks += page.get_text()
+    except Exception as e:
+        st.error(f"[Gagal Membaca PDF] {e}")
     return teks
 
-# --- Fungsi Analisis dengan Retry (exponential backoff + jitter) ---
-def analisis_dokumen(teks, syarat, max_retries=5):
+# --- Fungsi Panggil API dengan Retry (Exponential Backoff + Jitter) ---
+def analisis_dokumen(teks, syarat, max_retries=6):
     prompt = f"""
     Periksa dokumen berikut terhadap persyaratan ini:
     {syarat}
@@ -77,9 +81,9 @@ def analisis_dokumen(teks, syarat, max_retries=5):
             )
             return response.choices[0].message.content
 
-        except RateLimitError:
-            wait_time = (2 ** attempt) + random.uniform(0, 2)
-            st.warning(f"[RateLimit] Menunggu {wait_time:.1f} detik sebelum retry (percobaan {attempt+1}/{max_retries})...")
+        except (RateLimitError, ServiceUnavailableError):
+            wait_time = min(60, (2 ** attempt) + random.uniform(0, 2))
+            st.warning(f"[RateLimit] Menunggu {wait_time:.1f} detik sebelum retry ({attempt+1}/{max_retries})...")
             time.sleep(wait_time)
 
         except (APIError, APIConnectionError) as e:
@@ -111,27 +115,32 @@ if st.button("🔍 Proses Analisis"):
     else:
         hasil_semua = {}
         skor_list = []
+        df_hasil = []
 
         dok_list = [dok1, dok2, dok3, dok4] if is_reklamasi else [dok1, dok2, dok3]
         nama_list = ["dok1", "dok2", "dok3", "dok4"] if is_reklamasi else ["dok1", "dok2", "dok3"]
 
         for dok, nama in zip(dok_list, nama_list):
             if dok:
+                st.info(f"📄 Memproses {nama.upper()} ...")
                 teks = baca_pdf(dok)
                 hasil = analisis_dokumen(teks, persyaratan[nama])
                 hasil_semua[nama] = hasil
 
-                # Ekstraksi skor dari hasil (jika ada)
+                # Ekstraksi skor
                 match = re.search(r"Skor\s*[:\-]?\s*(\d+)", hasil)
-                if match:
-                    try:
-                        skor_list.append(int(match.group(1)))
-                    except ValueError:
-                        pass
+                skor = int(match.group(1)) if match else 0
+                skor_list.append(skor)
+
+                df_hasil.append({
+                    "Dokumen": nama.upper(),
+                    "Skor": skor,
+                    "Hasil Analisis": hasil
+                })
 
                 time.sleep(1.5)  # jeda kecil antar dokumen
 
-        # Hitung total & rata-rata
+        # Rekap skor
         total_skor = sum(skor_list)
         rata_skor = total_skor / len(skor_list) if skor_list else 0
 
@@ -147,3 +156,7 @@ if st.button("🔍 Proses Analisis"):
             st.success("✅ Lolos Verifikasi")
         else:
             st.error("❌ Tidak Lolos Verifikasi")
+
+        # Tampilkan tabel
+        st.subheader("📄 Tabel Rekap")
+        st.dataframe(pd.DataFrame(df_hasil))
