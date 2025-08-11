@@ -1,80 +1,73 @@
-# Streamlit prototype: Document Verification for Licensing Documents with AI
-# Updated: Removed pdfminer dependency for easier deployment on Streamlit Cloud.
-
 import streamlit as st
-from io import BytesIO
-import tempfile
-import os
-import re
+import PyPDF2
 from docx import Document
-from PIL import Image
-import pytesseract
-from PyPDF2 import PdfReader
+import openai
+import io
 
-st.set_page_config(page_title="Verifikasi Dokumen Perizinan", layout="wide")
+# ===== KONFIGURASI OPENAI API =====
+# Pastikan tambahkan OPENAI_API_KEY di Secrets Streamlit
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# --- Required sections for licensing documents ---
-REQUIRED_SECTIONS = [
-    "Rencana kegiatan",
-    "dokumen dasar berupa kegiatan, tujuan dan manfaat kegiatan usaha",
-    "kegiatan eksisting yang dimohonkan",
-    "rencana jadwal pelaksanaan kegiatan utama dan pendukungnya",
-    "Rencana tapak/site plan kegiatan",
-    "deskriptif luasan",
-    "Peta lokasi/plotting batas-batas area"
-]
-
-def extract_text(file_bytes: bytes, filename: str) -> str:
-    lower = filename.lower()
+# ====== FUNGSI EKSTRAK TEKS ======
+def extract_text_from_pdf(file):
+    pdf_reader = PyPDF2.PdfReader(file)
     text = ""
-    if lower.endswith('.pdf'):
-        try:
-            reader = PdfReader(BytesIO(file_bytes))
-            for page in reader.pages:
-                text += page.extract_text() or ""
-        except Exception as e:
-            st.error(f"Gagal mengekstrak teks PDF: {e}")
-    elif lower.endswith('.docx'):
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp:
-            tmp.write(file_bytes)
-            tmp.flush()
-            doc = Document(tmp.name)
-            paragraphs = [p.text for p in doc.paragraphs]
-            text = "\n".join(paragraphs)
-        os.unlink(tmp.name)
-    elif lower.endswith('.txt'):
-        text = file_bytes.decode('utf-8', errors='ignore')
-    elif lower.endswith(('.png', '.jpg', '.jpeg')):
-        img = Image.open(BytesIO(file_bytes))
-        text = pytesseract.image_to_string(img)
+    for page in pdf_reader.pages:
+        text += page.extract_text() + "\n"
     return text
 
-def verify_document(text: str) -> dict:
-    results = {}
-    for section in REQUIRED_SECTIONS:
-        results[section] = bool(re.search(re.escape(section), text, re.IGNORECASE))
-    # Check for coordinates format (latitude, longitude)
-    coord_pattern = r"-?\d{1,3}\.\d+\s*,\s*-?\d{1,3}\.\d+"
-    results['koordinat_ditemukan'] = bool(re.search(coord_pattern, text))
-    return results
+def extract_text_from_docx(file):
+    doc = Document(file)
+    return "\n".join([para.text for para in doc.paragraphs])
 
-st.title("Verifikasi Dokumen Perizinan")
-st.write("Upload dokumen perizinan (PDF, DOCX, TXT, PNG, JPG) untuk memeriksa kelengkapan persyaratan.")
+# ====== ANALISIS AI ======
+def analisis_ai(teks_dokumen):
+    prompt = f"""
+    Anda adalah sistem verifikasi dokumen perizinan.
+    Periksa apakah dokumen berikut memuat informasi sesuai kriteria:
 
-uploaded = st.file_uploader("Pilih file dokumen", type=['pdf', 'docx', 'txt', 'png', 'jpg', 'jpeg'])
-if uploaded:
-    file_bytes = uploaded.read()
-    with st.spinner('Ekstraksi teks dari dokumen...'):
-        extracted = extract_text(file_bytes, uploaded.name)
+    1) Rencana kegiatan:
+        - Kegiatan, tujuan, manfaat
+        - Kegiatan eksisting
+        - Jadwal pelaksanaan
+        - Site plan
+        - Luasan lokasi
+    2) Peta lokasi beserta koordinat
 
-    st.subheader("Teks yang diekstrak (preview)")
-    st.text_area("Extracted text", value=extracted[:5000], height=300)
+    Dokumen:
+    {teks_dokumen}
 
-    st.subheader("Hasil Verifikasi")
-    checks = verify_document(extracted)
-    st.json(checks)
+    Buatkan:
+    - Ringkasan
+    - Checklist kelengkapan poin di atas (lengkap/tidak)
+    - Saran perbaikan
+    """
+    response = openai.ChatCompletion.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0
+    )
+    return response.choices[0].message["content"]
 
-    completeness = sum(1 for v in checks.values() if v) / len(checks) * 100
-    st.write(f"**Persentase kelengkapan dokumen:** {completeness:.2f}%")
-else:
-    st.info("Unggah dokumen untuk memulai verifikasi.")
+# ====== STREAMLIT APP ======
+st.title("📄 AI Verifikasi Dokumen Perizinan")
+
+uploaded_file = st.file_uploader("Unggah dokumen (PDF atau DOCX)", type=["pdf", "docx"])
+
+if uploaded_file is not None:
+    if uploaded_file.type == "application/pdf":
+        text = extract_text_from_pdf(uploaded_file)
+    elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        text = extract_text_from_docx(uploaded_file)
+    else:
+        st.error("Format file tidak didukung.")
+        st.stop()
+
+    st.subheader("📜 Teks Dokumen")
+    st.text_area("Isi dokumen:", text, height=200)
+
+    if st.button("🔍 Analisis Dokumen dengan AI"):
+        with st.spinner("Menganalisis dokumen..."):
+            hasil = analisis_ai(text)
+        st.subheader("📊 Hasil Analisis AI")
+        st.write(hasil)
