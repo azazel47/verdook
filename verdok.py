@@ -1,7 +1,10 @@
 import streamlit as st
-from openai import OpenAI
+from openai import OpenAI, RateLimitError, APIError, APIConnectionError
 import fitz  # PyMuPDF
 import pandas as pd
+import time
+import random
+import re
 
 # --- Konfigurasi API ---
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
@@ -51,8 +54,8 @@ def baca_pdf(uploaded_file):
         teks += page.get_text()
     return teks
 
-# --- Fungsi Analisis ---
-def analisis_dokumen(teks, syarat):
+# --- Fungsi Analisis dengan Retry ---
+def analisis_dokumen(teks, syarat, max_retries=5):
     prompt = f"""
     Periksa dokumen berikut terhadap persyaratan ini:
     {syarat}
@@ -65,12 +68,30 @@ def analisis_dokumen(teks, syarat):
     Dokumen:
     {teks}
     """
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0
-    )
-    return response.choices[0].message.content
+    for attempt in range(max_retries):
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0
+            )
+            return response.choices[0].message.content
+
+        except RateLimitError:
+            wait_time = (attempt + 1) * 3 + random.uniform(0, 2)
+            st.warning(f"[RateLimit] Menunggu {wait_time:.1f} detik sebelum retry...")
+            time.sleep(wait_time)
+
+        except (APIError, APIConnectionError) as e:
+            wait_time = (attempt + 1) * 2
+            st.warning(f"[API Error] {e}. Retry dalam {wait_time} detik...")
+            time.sleep(wait_time)
+
+        except Exception as e:
+            st.error(f"[Error] {e}")
+            break
+
+    return "[Gagal menganalisis dokumen]"
 
 # --- UI ---
 st.title("📄 Verifikasi Kelengkapan Dokumen")
@@ -91,23 +112,25 @@ if st.button("🔍 Proses Analisis"):
         hasil_semua = {}
         skor_list = []
 
-        for idx, (dok, nama) in enumerate(zip(
-            [dok1, dok2, dok3, dok4] if is_reklamasi else [dok1, dok2, dok3],
-            ["dok1", "dok2", "dok3", "dok4"] if is_reklamasi else ["dok1", "dok2", "dok3"]
-        )):
+        dok_list = [dok1, dok2, dok3, dok4] if is_reklamasi else [dok1, dok2, dok3]
+        nama_list = ["dok1", "dok2", "dok3", "dok4"] if is_reklamasi else ["dok1", "dok2", "dok3"]
+
+        for dok, nama in zip(dok_list, nama_list):
             if dok:
                 teks = baca_pdf(dok)
                 hasil = analisis_dokumen(teks, persyaratan[nama])
                 hasil_semua[nama] = hasil
-                # Ekstraksi skor dari teks hasil
-                import re
+
+                # Ekstraksi skor dari hasil
                 match = re.search(r"Skor\s*[:\-]?\s*(\d+)", hasil)
                 if match:
                     skor_list.append(int(match.group(1)))
 
-        # Hitung total & rata-rata
+                time.sleep(1.5)  # jeda antar dokumen
+
+        # Hitung total & rata-rata dengan aman
         total_skor = sum(skor_list)
-        
+        rata_skor = total_skor / len(skor_list) if skor_list else 0
 
         st.subheader("📊 Hasil Analisis Per Dokumen")
         for nama, konten in hasil_semua.items():
