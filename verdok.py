@@ -1,10 +1,11 @@
 import streamlit as st
-from openai import OpenAI
+import openai
 import fitz  # PyMuPDF
 import pandas as pd
+import re
 
 # --- Konfigurasi API ---
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 # --- Persyaratan ---
 persyaratan = {
@@ -65,17 +66,17 @@ def analisis_dokumen(teks, syarat):
     Dokumen:
     {teks}
     """
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
+    response = openai.ChatCompletion.create(
+        model="gpt-4",  # Sesuai SDK lama
         messages=[{"role": "user", "content": prompt}],
         temperature=0
     )
-    return response.choices[0].message.content
+    return response.choices[0].message["content"]
 
 # --- UI ---
 st.title("📄 Verifikasi Kelengkapan Dokumen")
 
-is_reklamasi = st.checkbox("Reklamasi (Dokumen 4 wajib diunggah)")
+is_reklamasi = st.checkbox("Reklamasi (Dokumen 4 jika ada)")
 
 dok1 = st.file_uploader("📄 Upload Dokumen 1", type=["pdf"])
 dok2 = st.file_uploader("📄 Upload Dokumen 2", type=["pdf"])
@@ -85,39 +86,45 @@ if is_reklamasi:
     dok4 = st.file_uploader("📄 Upload Dokumen 4", type=["pdf"])
 
 if st.button("🔍 Proses Analisis"):
-    if not dok1 or not dok2 or not dok3 or (is_reklamasi and not dok4):
-        st.error("⚠️ Semua dokumen wajib diunggah sesuai ketentuan!")
-    else:
-        hasil_semua = {}
-        skor_list = []
+    hasil_semua = {}
+    skor_list = []
+    dokumen_input = [
+        (dok1, "dok1"),
+        (dok2, "dok2"),
+        (dok3, "dok3")
+    ]
+    if is_reklamasi:
+        dokumen_input.append((dok4, "dok4"))
 
-        for idx, (dok, nama) in enumerate(zip(
-            [dok1, dok2, dok3, dok4] if is_reklamasi else [dok1, dok2, dok3],
-            ["dok1", "dok2", "dok3", "dok4"] if is_reklamasi else ["dok1", "dok2", "dok3"]
-        )):
-            if dok:
-                teks = baca_pdf(dok)
-                hasil = analisis_dokumen(teks, persyaratan[nama])
-                hasil_semua[nama] = hasil
-                # Ekstraksi skor dari teks hasil
-                import re
-                match = re.search(r"Skor\s*[:\-]?\s*(\d+)", hasil)
-                if match:
-                    skor_list.append(int(match.group(1)))
+    for dok, nama in dokumen_input:
+        if dok:
+            teks = baca_pdf(dok)
+            hasil = analisis_dokumen(teks, persyaratan[nama])
+            hasil_semua[nama] = hasil
 
-        # Hitung total & rata-rata
-        total_skor = sum(skor_list)
-        rata_skor = total_skor / len(skor_list)
+            match = re.search(r"Skor\s*[:\-]?\s*(\d+)", hasil)
+            if match:
+                skor_list.append(int(match.group(1)))
+        else:
+            hasil_semua[nama] = "⚠️ Dokumen tidak diunggah, analisis dilewati."
 
-        st.subheader("📊 Hasil Analisis Per Dokumen")
-        for nama, konten in hasil_semua.items():
-            st.markdown(f"**{nama.upper()}**")
-            st.markdown(konten)
+    # Hitung skor
+    total_skor = sum(skor_list) if skor_list else 0
+    rata_skor = (total_skor / len(skor_list)) if skor_list else 0
 
-        st.subheader("📈 Rekapitulasi Skor")
-        st.write(f"Total Skor: {total_skor}")
-        st.write(f"Rata-rata Skor: {rata_skor:.2f}")
+    st.subheader("📊 Hasil Analisis Per Dokumen")
+    for nama, konten in hasil_semua.items():
+        st.markdown(f"**{nama.upper()}**")
+        st.markdown(konten)
+
+    st.subheader("📈 Rekapitulasi Skor")
+    st.write(f"Total Skor: {total_skor}")
+    st.write(f"Rata-rata Skor: {rata_skor:.2f}")
+
+    if skor_list:
         if rata_skor >= 70:
             st.success("✅ Lolos Verifikasi")
         else:
             st.error("❌ Tidak Lolos Verifikasi")
+    else:
+        st.warning("⚠️ Tidak ada dokumen yang bisa dianalisis.")
