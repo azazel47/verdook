@@ -1,7 +1,5 @@
-streamlit
-PyPDF2
-python-docx
-openai>=1.0.0
+streamlit>=1.36.0
+openai>=1.3.0
 PyMuPDF
-docx2txt
-
+pandas
+tenacity
