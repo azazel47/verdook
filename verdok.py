@@ -1,33 +1,48 @@
 import streamlit as st
-import openai
+import os
+from openai import OpenAI
+import docx
+import fitz  # PyMuPDF untuk PDF
 
-# =========================
-# KONFIGURASI API KEY
-# =========================
-# Ambil API key dari Streamlit Secrets
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+# Inisialisasi client OpenAI dengan API Key dari Secret Streamlit
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# =========================
-# FUNGSI ANALISIS DOKUMEN
-# =========================
-def analisis_ai(teks_dokumen):
-    prompt = f"""
-    Anda adalah asisten AI yang bertugas memverifikasi isi dokumen.
-    Baca teks dokumen berikut dan berikan analisis yang jelas:
-    - Apakah dokumen lengkap?
-    - Apakah ada data yang tidak konsisten?
-    - Ringkas isi dokumen.
+# Fungsi ekstrak teks dari file
+def extract_text(file):
+    text = ""
+    if file.name.endswith(".txt"):
+        text = file.read().decode("utf-8")
+    elif file.name.endswith(".docx"):
+        doc = docx.Document(file)
+        text = "\n".join([para.text for para in doc.paragraphs])
+    elif file.name.endswith(".pdf"):
+        pdf = fitz.open(stream=file.read(), filetype="pdf")
+        for page in pdf:
+            text += page.get_text()
+    return text.strip()
 
-    Teks Dokumen:
-    {teks_dokumen}
-    """
+# Fungsi analisis AI
+def analisis_dokumen(text):
+    kriteria = """
+Periksa apakah dokumen ini memenuhi semua poin berikut:
 
-    client = openai.OpenAI(api_key=openai.api_key)
+1) Rencana kegiatan:
+   i. Dokumen dasar: kegiatan, tujuan, dan manfaat usaha.
+   ii. Kegiatan eksisting yang dimohonkan.
+   iii. Rencana jadwal pelaksanaan kegiatan utama & pendukung.
+   iv. Rencana tapak/site plan dengan bangunan, instalasi di laut, & fasilitas penunjang.
+   v. Luasan (Ha) per kegiatan utama & penunjang.
+
+2) Peta lokasi / plotting batas area dengan koordinat lintang & bujur.
+
+Buat ringkasan apakah tiap poin tersebut ADA atau TIDAK ADA, dan berikan saran jika kurang.
+"""
+    prompt = f"Teks dokumen:\n{text}\n\n{kriteria}"
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "Anda adalah analis dokumen yang teliti."},
+            {"role": "system", "content": "Anda adalah asisten yang memeriksa kelengkapan dokumen teknis."},
             {"role": "user", "content": prompt}
         ],
         temperature=0
@@ -35,30 +50,18 @@ def analisis_ai(teks_dokumen):
 
     return response.choices[0].message.content
 
-# =========================
-# APLIKASI STREAMLIT
-# =========================
-st.set_page_config(page_title="Verifikasi Dokumen AI", page_icon="📄", layout="wide")
-st.title("📄 Verifikasi Dokumen dengan AI")
+# UI Streamlit
+st.title("📄 Verifikasi Kelengkapan Dokumen")
 
-uploaded_file = st.file_uploader("Unggah dokumen (TXT atau PDF)", type=["txt", "pdf"])
+uploaded_file = st.file_uploader("Unggah dokumen (PDF, DOCX, TXT)", type=["pdf", "docx", "txt"])
 
 if uploaded_file is not None:
-    # Baca isi file
-    if uploaded_file.type == "application/pdf":
-        import fitz  # PyMuPDF
-        pdf = fitz.open(stream=uploaded_file.read(), filetype="pdf")
-        teks = ""
-        for halaman in pdf:
-            teks += halaman.get_text()
-    else:
-        teks = uploaded_file.read().decode("utf-8", errors="ignore")
+    with st.spinner("📄 Membaca dokumen..."):
+        teks_dokumen = extract_text(uploaded_file)
 
-    st.subheader("📜 Isi Dokumen")
-    st.text_area("Teks dokumen:", teks, height=300)
-
-    if st.button("🔍 Analisis Dokumen"):
-        with st.spinner("Sedang menganalisis dokumen..."):
-            hasil = analisis_ai(teks)
-        st.subheader("📊 Hasil Analisis AI")
+    if teks_dokumen:
+        st.subheader("📑 Hasil Analisis AI")
+        hasil = analisis_dokumen(teks_dokumen)
         st.write(hasil)
+    else:
+        st.error("Tidak ada teks yang bisa diekstrak dari dokumen.")
