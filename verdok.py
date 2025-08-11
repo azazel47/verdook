@@ -5,6 +5,7 @@ import pandas as pd
 import time
 import random
 import re
+import openai
 from openai import OpenAI
 from openai import APIError, APIConnectionError, RateLimitError, ServiceUnavailableError
 
