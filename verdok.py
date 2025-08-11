@@ -28,9 +28,9 @@ peta/gambar, sumber data) yang mencakup:
 •	penjelasan terkait informasi persentase tutupan karang hidup;
 •	Penjelasan terkait informasi luasan.
 2) Permodelan data hidro-oseanografi:
-i. arus ( disertai narasi (pasang surut campuran harian gand atau yg lainnya),peta/gambar, sumber data)
+i. arus ( disertai narasi (kecepatan dan arah), peta/gambar, sumber data)
 ii. gelombang ( disertai narasi,peta/gambar, sumber data)
-iii. pasang surut ( disertai narasi,peta/gambar, sumber data)
+iii. pasang surut ( disertai narasi (pasang surut campuran harian gand atau yg lainnya),peta/gambar, sumber data)
 iv. batimetri ( disertai narasi,peta/gambar, sumber data)
 
 3) Profil dasar laut disertai narasi (berlumpur/berbatu/dll) dan gambar dokumentasi dasar laut atau profil penampang melintang;
