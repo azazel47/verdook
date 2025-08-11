@@ -3,11 +3,11 @@ import PyPDF2
 from docx import Document
 import openai
 import io
+import os
+from openai import OpenAI
 
-import streamlit as st
-
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 st.write("OPENAI_API_KEY" in st.secrets)  # Harus True
-
 
 # ===== KONFIGURASI OPENAI API =====
 # Pastikan tambahkan OPENAI_API_KEY di Secrets Streamlit
