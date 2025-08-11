@@ -3,15 +3,44 @@ import fitz  # PyMuPDF
 import re
 import google.generativeai as genai
 
-# --- Konfigurasi API Gemini ---
-genai.configure(api_key=st.secrets["OPENAI_API_KEY"])
+# --- Konfigurasi API ---
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-# --- Persyaratan (sama seperti sebelumnya) ---
+# --- Persyaratan ---
 persyaratan = {
-    "dok1": """...""",
-    "dok2": """...""",
-    "dok3": """...""",
-    "dok4": """..."""
+    "dok1": """
+    1) Rencana kegiatan:
+    I. Dokumen dasar berupa kegiatan, tujuan, manfaat usaha (jelas & lengkap).
+    II. Kegiatan eksisting yang dimohonkan (jelas jenisnya).
+    III. Rencana jadwal pelaksanaan utama & pendukung (jelas, tabel jika perlu).
+    IV. Rencana tapak/site plan + instalasi laut + fasilitas penunjang.
+    V. Deskriptif luasan (Ha) per kegiatan utama & penunjang.
+    2) Peta lokasi + koordinat lintang/bujur.
+    """,
+    "dok2": """
+    Informasi Pemanfaatan Ruang Laut di sekitar lokasi
+    (contoh: penggunaan ruang sekitar oleh masyarakat + jarak dari lokasi pemohon).
+    """,
+    "dok3": """
+    1) Ekosistem sekitar:
+       - Mangrove (jenis, persentase tutupan, luas, peta, sumber data)
+       - Lamun (jenis, persentase padang lamun sehat, luas, peta, sumber data)
+       - Terumbu Karang (jenis, persentase karang hidup, luas, peta, sumber data)
+    2) Hidro-oseanografi:
+       - Arus (tipe pasang surut, peta, sumber data)
+       - Gelombang (peta, sumber data)
+       - Pasang surut (peta, sumber data)
+       - Batimetri (peta, sumber data)
+    3) Profil dasar laut + foto
+    4) Sosial ekonomi masyarakat
+    5) Aksesibilitas lokasi
+    """,
+    "dok4": """
+    1) Rencana pengambilan material reklamasi (lokasi, jarak, jumlah, metode, gambar)
+    2) Rencana pemanfaatan lahan reklamasi + peta + luas
+    3) Metode pelaksanaan reklamasi (teknis, material, penimbunan)
+    4) Jadwal pelaksanaan reklamasi (tabel)
+    """
 }
 
 # --- Fungsi Baca PDF ---
@@ -22,7 +51,7 @@ def baca_pdf(uploaded_file):
         teks += page.get_text()
     return teks
 
-# --- Fungsi Analisis pakai Gemini ---
+# --- Fungsi Analisis dengan Gemini ---
 def analisis_dokumen(teks, syarat):
     prompt = f"""
     Periksa dokumen berikut terhadap persyaratan ini:
@@ -36,12 +65,19 @@ def analisis_dokumen(teks, syarat):
     Dokumen:
     {teks}
     """
-    model = genai.GenerativeModel("gemini-1.5-pro")  # bisa ganti model lain
-    response = model.generate_content(prompt)
-    return response.text
+    model = genai.GenerativeModel("gemini-1.5-pro")
+    try:
+        response = model.generate_content([prompt])
+
+        if response.candidates and response.candidates[0].content.parts:
+            return response.candidates[0].content.parts[0].text
+        else:
+            return "⚠️ Tidak ada hasil dari Gemini."
+    except Exception as e:
+        return f"❌ Error saat memanggil Gemini API: {e}"
 
 # --- UI ---
-st.title("📄 Verifikasi Kelengkapan Dokumen (Gemini)")
+st.title("📄 Verifikasi Kelengkapan Dokumen (Gemini AI)")
 
 is_reklamasi = st.checkbox("Reklamasi (Dokumen 4 jika ada)")
 
@@ -56,7 +92,11 @@ if st.button("🔍 Proses Analisis"):
     hasil_semua = {}
     skor_list = []
 
-    dokumen_input = [(dok1, "dok1"), (dok2, "dok2"), (dok3, "dok3")]
+    dokumen_input = [
+        (dok1, "dok1"),
+        (dok2, "dok2"),
+        (dok3, "dok3")
+    ]
     if is_reklamasi:
         dokumen_input.append((dok4, "dok4"))
 
@@ -72,9 +112,11 @@ if st.button("🔍 Proses Analisis"):
         else:
             hasil_semua[nama] = "⚠️ Dokumen tidak diunggah, analisis dilewati."
 
+    # Hitung skor
     total_skor = sum(skor_list) if skor_list else 0
     rata_skor = (total_skor / len(skor_list)) if skor_list else 0
 
+    # Tampilkan hasil
     st.subheader("📊 Hasil Analisis Per Dokumen")
     for nama, konten in hasil_semua.items():
         st.markdown(f"**{nama.upper()}**")
