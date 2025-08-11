@@ -1,8 +1,6 @@
-openai>=1.0.0
-streamlit>=1.36.0
-PyMuPDF
+streamlit
+PyPDF2
+python-docx
 pandas
-tenacity
-openai.error
-
-
+geopandas
+shapely
