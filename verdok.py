@@ -1,11 +1,10 @@
 import streamlit as st
-import openai
-import fitz  # PyMuPDF
-import pandas as pd
-import re
 from openai import OpenAI
+import fitz  # PyMuPDF
+import re
+
 # --- Konfigurasi API ---
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # --- Persyaratan ---
 persyaratan = {
@@ -67,18 +66,11 @@ def analisis_dokumen(teks, syarat):
     {teks}
     """
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # atau model lain
+        model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
         temperature=0
     )
     return response.choices[0].message.content
-
-# return langsung hasil teks
-return response.choices[0].message.content
-
-hasil = analisis_dokumen("isi teks pdf", "isi persyaratan")
-print(hasil)
-
 
 # --- UI ---
 st.title("📄 Verifikasi Kelengkapan Dokumen")
@@ -95,6 +87,7 @@ if is_reklamasi:
 if st.button("🔍 Proses Analisis"):
     hasil_semua = {}
     skor_list = []
+
     dokumen_input = [
         (dok1, "dok1"),
         (dok2, "dok2"),
@@ -119,6 +112,7 @@ if st.button("🔍 Proses Analisis"):
     total_skor = sum(skor_list) if skor_list else 0
     rata_skor = (total_skor / len(skor_list)) if skor_list else 0
 
+    # Tampilkan hasil
     st.subheader("📊 Hasil Analisis Per Dokumen")
     for nama, konten in hasil_semua.items():
         st.markdown(f"**{nama.upper()}**")
