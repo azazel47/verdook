@@ -9,14 +9,23 @@ client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 def analisis_dokumen(teks):
     prompt = f"""
     Periksa dokumen berikut untuk memastikan kelengkapan dan kesesuaian poin:
-
-    1) Rencana kegiatan:
-        i. Dokumen dasar: kegiatan, tujuan, manfaat (lengkap bentuk kegiatan).
-        ii. Kegiatan eksisting (lengkap jenisnya).
-        iii. Rencana jadwal pelaksanaan utama & pendukung (boleh tabel).
-        iv. Rencana tapak/site plan (dilengkapi bangunan, instalasi laut, fasilitas penunjang).
-        v. Deskripsi luasan (Ha) per kegiatan utama & penunjang.
-    2) Peta lokasi: batas area/jalur dengan titik koordinat lintang & bujur.
+    Anda adalah asisten verifikasi dokumen lingkungan.
+    Periksa dokumen berikut dan:
+    1. Pastikan semua poin ketentuan berikut ada:
+       **1) Ekosistem sekitar**
+       i. Mangrove - jenis, persentase penutupan, luasan.
+       ii. Lamun - jenis, persentase penutupan, luasan.
+       iii. Terumbu Karang - jenis, persentase tutupan karang hidup, luasan.
+       **2) Permodelan hidro-oseanografi**
+       i. Arus - sertakan nilai (m/s) dan jenis arus.
+       ii. Gelombang - sertakan nilai tinggi gelombang (m).
+       iii. Pasang surut - sertakan nilai rentang pasang surut (m).
+       iv. Batimetri - sertakan nilai kedalaman (m).
+       **3) Profil dasar laut**
+       **4) Sosial-ekonomi masyarakat**
+       **5) Aksesibilitas lokasi**
+    2. Berikan skor kelengkapan 0-100 untuk setiap poin.
+    3. Tampilkan tabel checklist berwarna (Hijau = Lengkap, Kuning = Kurang Lengkap, Merah = Tidak Ada).
 
     Aturan tambahan:
     - Setiap narasi hidrooseanografi HARUS menyebutkan nilai numerik (contoh kedalaman, kecepatan arus, tinggi gelombang, dsb.).
