@@ -5,8 +5,7 @@ import time
 import random
 import re
 
-from openai import OpenAI
-from openai.error import APIError, APIConnectionError, RateLimitError, ServiceUnavailableError
+from openai import OpenAI, APIError, APIConnectionError, RateLimitError, ServiceUnavailableError
 
 
 # --- Konfigurasi API ---
