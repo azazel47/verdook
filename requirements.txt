@@ -8,3 +8,4 @@ pdf2image
 pandas
 folium
 streamlit-folium
+spacy
