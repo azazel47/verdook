@@ -61,7 +61,7 @@ def verify_document(text: str, has_image: bool) -> dict:
 
     # --- Additional requirements ---
     if results["rencana jadwal pelaksanaan kegiatan"]:
-        results["jadwal_memiliki_tabel_gambar"] = has_image  # asumsi ada gambar/tabel jika ada image di dokumen
+        results["jadwal_memiliki_tabel_gambar"] = has_image
     else:
         results["jadwal_memiliki_tabel_gambar"] = False
 
@@ -71,6 +71,12 @@ def verify_document(text: str, has_image: bool) -> dict:
         results["peta_memiliki_gambar"] = False
 
     return results
+
+def render_results(results: dict):
+    st.markdown("### Ringkasan Hasil Verifikasi")
+    for key, val in results.items():
+        icon = "✅" if val else "❌"
+        st.write(f"{icon} {key}")
 
 st.title("Verifikasi Dokumen Perizinan")
 st.write("Upload dokumen perizinan (PDF, TXT, PNG, JPG) untuk memeriksa kelengkapan persyaratan.")
@@ -84,9 +90,11 @@ if uploaded:
     st.subheader("Teks yang diekstrak (preview)")
     st.text_area("Extracted text", value=extracted[:5000], height=300)
 
-    st.subheader("Hasil Verifikasi")
+    st.subheader("Hasil Verifikasi (JSON)")
     checks = verify_document(extracted, has_image)
     st.json(checks)
+
+    render_results(checks)
 
     completeness = sum(1 for v in checks.values() if v) / len(checks) * 100
     st.write(f"**Persentase kelengkapan dokumen:** {completeness:.2f}%")
