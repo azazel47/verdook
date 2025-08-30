@@ -1,11 +1,4 @@
 streamlit
-pdfplumber
-pymupdf
+PyPDF2
 python-docx
-pillow
-pytesseract
-pdf2image
 pandas
-folium
-streamlit-folium
-spacy
