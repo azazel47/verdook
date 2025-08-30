@@ -1,3 +1,10 @@
 streamlit
+pdfplumber
+pymupdf
+python-docx
+pillow
+pytesseract
+pdf2image
 pandas
-pydeck
+folium
+streamlit-folium
