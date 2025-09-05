@@ -1,4 +1,6 @@
 streamlit
-pytesseract
-Pillow
+pymupdf
+pdfplumber
 PyPDF2
+pandas
+numpy
