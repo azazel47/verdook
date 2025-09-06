@@ -23,7 +23,7 @@ except Exception:
 KEYWORDS = {
     "Informasi Pemohon": [
         r"informasi\s+kegiatan", r"informasi\s+pemohon", r"rencana\s+kegiatan",
-        r"uraian\s+kegiatan", r"profil", r"nama", r"alamat"
+        r"uraian\s+kegiatan", r"profil", r"nama[:\s]*", r"alamat"
     ],
     "Tujuan": [
         r"tujuan", r"maksud", r"sasaran", r"target", r"orientasi",
