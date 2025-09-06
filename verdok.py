@@ -19,11 +19,12 @@ try:
 except Exception:
     PdfReader = None
 
+
 # --------------------------- Keyword Persyaratan ---------------------------
 KEYWORDS = {
     "Informasi Pemohon": [
         r"informasi\s+kegiatan", r"informasi\s+pemohon", r"rencana\s+kegiatan",
-        r"uraian\s+kegiatan", r"profil", r"nama[:\s]*", r"alamat"
+        r"uraian\s+kegiatan", r"profil", r"nama", r"alamat"
     ],
     "Tujuan": [
         r"tujuan", r"maksud", r"sasaran", r"target", r"orientasi",
@@ -61,7 +62,7 @@ KEYWORDS = {
 }
 
 SECTION_ALIASES = {
-    "Informasi Pemohon": ["informasi kegiatan", "rencana kegiatan", "informasi pemohon.*"],
+    "Informasi Pemohon": ["informasi kegiatan", "rencana kegiatan", "informasi pemohon"],
     "Tujuan": ["tujuan", "maksud"],
     "Manfaat": ["manfaat"],
     "Kegiatan Eksisting Yang Dimohonkan": ["kegiatan eksisting", "usulan kegiatan"],
@@ -82,9 +83,11 @@ REQUIREMENTS = [
     {"name": "Peta Lokasi", "requires_visual": True, "requires_table": False}
 ]
 
+
 # --------------------------- Segmentasi Dokumen ---------------------------
-def segment_document(doc) -> Dict[str, str]:
+def segment_document(doc) -> (Dict[str, str], Dict[str, str]):
     sections = {r["name"]: "" for r in REQUIREMENTS}
+    headings = {r["name"]: "-" for r in REQUIREMENTS}  # simpan judul asli
     headings_found = []
 
     numbering_pattern = r"^(\d+(\.\d+)*\.?|[ivxlcdm]+\.?|[a-zA-Z]\.)\s*"
@@ -96,13 +99,10 @@ def segment_document(doc) -> Dict[str, str]:
                 continue
             for l in b["lines"]:
                 line_text = " ".join([s["text"] for s in l["spans"]]).strip()
-
-                # Harus bold
                 is_bold = any(s.get("flags", 0) & 2 for s in l["spans"])
                 if not is_bold:
                     continue
 
-                # Harus ada numbering
                 if not re.match(numbering_pattern, line_text, re.IGNORECASE):
                     continue
 
@@ -111,13 +111,13 @@ def segment_document(doc) -> Dict[str, str]:
                 for req, aliases in SECTION_ALIASES.items():
                     for alias in aliases:
                         alias_lower = alias.lower()
-                        if clean_text.startswith(alias_lower):  # prefix match
+                        if clean_text.startswith(alias_lower):
                             match_number = re.match(numbering_pattern, line_text).group(0)
-                            formatted_heading = f"{match_number}{alias}"
+                            formatted_heading = f"{match_number}{line_text}"
                             headings_found.append((req, page_num, l["bbox"], formatted_heading))
+                            headings[req] = formatted_heading
                             break
 
-    # Segmentasi antar heading
     for i, (req, page_num, bbox, heading_text) in enumerate(headings_found):
         end_page, _ = (
             (headings_found[i+1][1], headings_found[i+1][2])
@@ -125,11 +125,11 @@ def segment_document(doc) -> Dict[str, str]:
         )
         content_parts = []
         for p in range(page_num, end_page+1):
-            page = doc[p]
-            content_parts.append(page.get_text("text"))
+            content_parts.append(doc[p].get_text("text"))
         sections[req] = "\n".join(content_parts)
 
-    return sections
+    return sections, headings
+
 
 # --------------------------- Ekstraksi PDF ---------------------------
 def extract_with_pymupdf(file_bytes: bytes):
@@ -139,6 +139,7 @@ def extract_with_pymupdf(file_bytes: bytes):
     text_pages = [p.get_text("text") or "" for p in doc]
     images_per_page = {i: len(p.get_images(full=True)) for i, p in enumerate(doc)}
     return doc, text_pages, images_per_page
+
 
 def extract_with_pypdf2(file_bytes: bytes) -> List[str]:
     text_pages = []
@@ -151,6 +152,7 @@ def extract_with_pypdf2(file_bytes: bytes) -> List[str]:
         except Exception:
             text_pages.append("")
     return text_pages
+
 
 def detect_tables_with_pdfplumber(file_bytes: bytes) -> Dict[int, int]:
     table_counts = {}
@@ -165,6 +167,7 @@ def detect_tables_with_pdfplumber(file_bytes: bytes) -> Dict[int, int]:
                 table_counts[i] = 0
     return table_counts
 
+
 # --------------------------- Analisis ---------------------------
 def analyze_pdf(file_bytes: bytes) -> Dict:
     doc, text_pages, images_per_page = extract_with_pymupdf(file_bytes)
@@ -174,7 +177,7 @@ def analyze_pdf(file_bytes: bytes) -> Dict:
         return {"results": [], "stats": {}}
 
     table_counts = detect_tables_with_pdfplumber(file_bytes)
-    segmented = segment_document(doc)
+    segmented, headings = segment_document(doc)
 
     results = []
     for req in REQUIREMENTS:
@@ -182,24 +185,21 @@ def analyze_pdf(file_bytes: bytes) -> Dict:
         segment_text = segmented.get(name, "").lower()
         found_text = any(re.search(p, segment_text) for p in KEYWORDS.get(name, []))
 
-        # Default nilai
         visual_ok, table_ok = True, True
-
         if name in ["Jadwal Pelaksanaan Kegiatan", "Rencana Tapak/Siteplan", "Peta Lokasi"]:
-            # Wajib cek gambar/tabel
             if req["requires_visual"] and sum(images_per_page.values()) == 0:
                 visual_ok = False
             if req["requires_table"] and sum(table_counts.values()) == 0:
                 table_ok = False
             status = found_text and visual_ok and table_ok
         else:
-            # Hanya cek teks, gambar/tabel tidak mempengaruhi status
             status = found_text
             visual_ok = sum(images_per_page.values()) > 0
             table_ok = sum(table_counts.values()) > 0
 
         results.append({
             "Persyaratan": name,
+            "Judul SubBab": headings.get(name, "-"),
             "Ditemukan Teks": "✅" if found_text else "❌",
             "Ada Gambar/Tabel (Jika Wajib)": "✅" if (visual_ok or table_ok) else "❌",
             "Status": "✅ LENGKAP" if status else "❌ BELUM LENGKAP",
@@ -217,6 +217,7 @@ def analyze_pdf(file_bytes: bytes) -> Dict:
         "Kompleteness %": completeness,
     }
     return {"results": results, "stats": stats}
+
 
 # --------------------------- UI ---------------------------
 def main():
