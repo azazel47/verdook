@@ -31,22 +31,23 @@ KEYWORDS = {
     "Informasi Kegiatan": [
         r"informasi\s+kegiatan", r"rencana\s+kegiatan", r"uraian\s+kegiatan",
         r"rincian\s+kegiatan", r"gambaran\s+kegiatan", r"profil\s+kegiatan",
-        r"deskripsi\s+kegiatan", r"latar\s+belakang\s+kegiatan", r"ringkasan\s+kegiatan"
+        r"deskripsi\s+kegiatan", r"latar\s+belakang\s+kegiatan", r"ringkasan\s+kegiatan",
         r"ruang\s+laut", r"kegiatan\s+utama"
     ],
     "Tujuan": [
         r"tujuan", r"maksud", r"sasaran", r"target", r"orientasi",
-        r"objective", r"goal", r"visi", r"misi"
+        r"objective", r"goal", r"visi", r"misi", r"diharapkan", r"untuk"
     ],
     "Manfaat": [
         r"manfaat", r"kegunaan", r"dampak\s+positif", r"hasil\s+yang\s+diharapkan",
-        r"outcome", r"nilai\s+Tambah", r"keuntungan", r"faedah", r"benefit"
+        r"outcome", r"nilai\s+Tambah", r"keuntungan", r"faedah", r"benefit",
+        r"meningkatkan", r"menambah", r"mendorong"
     ],
     "Kegiatan Eksisting Yang Dimohonkan": [
         r"kegiatan\s+eksisting", r"kegiatan\s+eksisting\s+yang\s+dimohonkan",
         r"aktivitas\s+yang\s+sedang\s+berjalan",
-        r"program\s+berjalan", r"kondisi\s+eksisting", r"rencana\s+kegiatan",
-        r"usulan\s+kegiatan", r"proposal\s+kegiatan", r"permohonan\s+kegiatan",
+        r"program\s+berjalan", r"kondisi\s+eksisting", r"usulan\s+kegiatan",
+        r"proposal\s+kegiatan", r"permohonan\s+kegiatan",
         r"aktivitas\s+yang\s+diusulkan", r"pembangunan", r"fasilitas"
     ],
     "Jadwal Pelaksanaan Kegiatan": [
@@ -77,9 +78,9 @@ SECTION_ALIASES = {
     "Tujuan": ["tujuan", "maksud"],
     "Manfaat": ["manfaat"],
     "Kegiatan Eksisting Yang Dimohonkan": ["kegiatan eksisting", "kegiatan eksisting yang dimohonkan", "usulan kegiatan"],
-    "Jadwal Pelaksanaan Kegiatan": ["jadwal", "timeline"],
+    "Jadwal Pelaksanaan Kegiatan": ["jadwal", "timeline", "rencana jadwal"],
     "Rencana Tapak/Siteplan": ["siteplan", "rencana tapak", "denah"],
-    "Deskriptif Luasan yang Dibutuhkan": ["luasan", "luas", "kebutuhan lahan"],
+    "Deskriptif Luasan yang Dibutuhkan": ["deskriptif luasan", "luasan", "luas yang dibutuhkan"],
     "Peta Lokasi": ["peta lokasi", "denah lokasi", "lokasi kegiatan"],
 }
 
@@ -101,9 +102,9 @@ DATE_PATTERN = re.compile(r"\b(\d{1,2}[\-/]?\d{1,2}[\-/]?\d{2,4}|\bQ[1-4]\b|ming
 def segment_document(text: str) -> Dict[str, str]:
     sections = {r["name"]: "" for r in REQUIREMENTS}
     heading_pattern = re.compile(
-    r"^(?:\d+(?:\.\d+)*|[A-Z]\.|[A-Z]\d*\.|[A-Z][A-Z\s]{2,})\s+(.+)$",
-    re.MULTILINE,
-)
+        r"^(?:\d+(?:\.\d+)*|[A-Z]\.|[A-Z][A-Z\s]{2,})\s+(.+)$",
+        re.MULTILINE,
+    )
 
     matches = list(heading_pattern.finditer(text))
     for i, match in enumerate(matches):
@@ -114,19 +115,13 @@ def segment_document(text: str) -> Dict[str, str]:
         heading = match.group(1).strip().lower()
 
         # hanya mapping jika heading cocok dengan alias salah satu requirement
-        mapped = False
         for req, aliases in SECTION_ALIASES.items():
             if any(alias in heading for alias in aliases):
                 sections[req] = section_text
-                mapped = True
                 break
-
-        # jika heading tidak dikenali aliasnya → abaikan saja
-        if not mapped:
-            continue
+        # kalau heading tidak dikenali aliasnya → abaikan saja (tidak isi requirement)
 
     return sections
-
 
 # --------------------------- Ekstraksi PDF ---------------------------
 def extract_with_pymupdf(file_bytes: bytes) -> Tuple[List[str], Dict[int, int]]:
@@ -181,13 +176,14 @@ def analyze_pdf(file_bytes: bytes) -> Dict:
         segment_text = segmented.get(name, "")
         found_text = any(re.search(p, segment_text) for p in KEYWORDS.get(name, []))
 
+        # fallback: deteksi gambar/tabel dari teks (jika extractor gagal)
         visual_ok, table_ok, notes = True, True, []
         if req["requires_visual"]:
-            if sum(images_per_page.values()) == 0:
+            if sum(images_per_page.values()) == 0 and "gambar" not in segment_text:
                 visual_ok = False
                 notes.append("Wajib menyertakan gambar pada bab ini.")
         if req["requires_table"]:
-            if sum(table_counts.values()) == 0:
+            if sum(table_counts.values()) == 0 and "tabel" not in segment_text:
                 table_ok = False
                 notes.append("Wajib menyertakan tabel pada bab ini.")
         if not found_text:
