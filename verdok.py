@@ -22,18 +22,52 @@ except Exception:
 
 # --------------------------- Keyword Persyaratan ---------------------------
 KEYWORDS = {
-    "Informasi Kegiatan": [r"informasi\s+kegiatan", r"rencana\s+kegiatan", r"uraian\s+kegiatan"],
-    "Tujuan": [r"tujuan", r"maksud", r"sasaran"],
-    "Manfaat": [r"manfaat", r"kegunaan", r"benefit"],
-    "Kegiatan Eksisting Yang Dimohonkan": [r"kegiatan\s+eksisting", r"usulan\s+kegiatan", r"permohonan\s+kegiatan"],
-    "Jadwal Pelaksanaan Kegiatan": [r"jadwal", r"timeline", r"schedule"],
-    "Rencana Tapak/Siteplan": [r"site\s*plan", r"rencana\s+tapak", r"denah"],
-    "Deskriptif Luasan yang Dibutuhkan": [r"luas", r"m2", r"hektar", r"meter\s*persegi"],
-    "Peta Lokasi": [r"peta\s+lokasi", r"denah\s+lokasi", r"koordinat\s+lokasi"]
+    "Informasi Kegiatan": [
+        r"informasi\s+kegiatan", r"rencana\s+kegiatan", r"uraian\s+kegiatan",
+        r"rincian\s+kegiatan", r"gambaran\s+kegiatan", r"profil\s+kegiatan",
+        r"deskripsi\s+kegiatan", r"latar\s+belakang\s+kegiatan", r"ringkasan\s+kegiatan"
+        r"ruang\s+laut", r"fasilitas"
+    ],
+    "Tujuan": [
+        r"tujuan", r"maksud", r"sasaran", r"target", r"orientasi",
+        r"objective", r"goal", r"visi", r"misi"
+    ],
+    "Manfaat": [
+        r"manfaat", r"kegunaan", r"dampak\s+positif", r"hasil\s+yang\s+diharapkan",
+        r"outcome", r"nilai\s+Tambah", r"keuntungan", r"faedah", r"benefit"
+    ],
+    "Kegiatan Eksisting Yang Dimohonkan": [
+        r"kegiatan\s+eksisting", r"kegiatan\s+eksisting\s+yang\s+dimohonkan",
+        r"aktivitas\s+yang\s+sedang\s+berjalan",
+        r"program\s+berjalan", r"kondisi\s+eksisting", r"rencana\s+kegiatan",
+        r"usulan\s+kegiatan", r"proposal\s+kegiatan", r"permohonan\s+kegiatan",
+        r"aktivitas\s+yang\s+diusulkan", r"pembangunan", r"fasilitas"
+    ],
+    "Jadwal Pelaksanaan Kegiatan": [
+        r"jadwal", r"timeline", r"rencana\s+waktu", r"schedule", r"perencanaan\s+waktu",
+        r"timeframe", r"tahapan\s+pelaksanaan", r"roadmap", r"matriks\s+waktu"
+    ],
+    "Rencana Tapak/Siteplan": [
+        r"site\s*plan|siteplan", r"rencana\s+tapak", r"denah", r"denah\s+tapak",
+        r"gambar\s+tapak", r"layout", r"tata\s+letak", r"masterplan",
+        r"sketsa\s+lokasi", r"peta\s+tapak", r"diagram\s+site"
+    ],
+    "Deskriptif Luasan yang Dibutuhkan": [
+        r"luas(?:an)?", r"meter\s*persegi|m2|m\^2|m²|ha|hektar|hektare",
+        r"dimensi", r"ukuran", r"kebutuhan\s+luas", r"estimasi\s+luas",
+        r"spesifikasi\s+luasan", r"ukuran\s+area", r"kebutuhan\s+lahan",
+        r"luas\s+lahan", r"rincian\s+area", r"kapasitas\s+ruang"
+    ],
+    "Peta Lokasi": [
+        r"peta\s+lokasi", r"denah\s+lokasi", r"gambar\s+lokasi",
+        r"lokasi\s+proyek", r"map", r"posisi\s+geografis",
+        r"koordinat\s+lokasi", r"lokasi\s+tapak", r"sketsa\s+lokasi"
+    ],
 }
 
+
 SECTION_ALIASES = {
-    "Informasi Kegiatan": ["informasi kegiatan", "rencana kegiatan"],
+    "Informasi Kegiatan": ["informasi kegiatan", "rencana kegiatan.*"],
     "Tujuan": ["tujuan", "maksud"],
     "Manfaat": ["manfaat"],
     "Kegiatan Eksisting Yang Dimohonkan": ["kegiatan eksisting", "usulan kegiatan"],
