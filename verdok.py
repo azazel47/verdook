@@ -74,20 +74,20 @@ KEYWORDS = {
         r"peta\s+lokasi", r"lokasi", r"map", r"koordinat",
         r"denah\s+lokasi", r"gambar\s+lokasi", r"lokasi\s+proyek",
         r"posisi\s+geografis", r"koordinat\s+lokasi", r"lokasi\s+tapak",
-        r"sketsa\s+lokasi"
+        r"sketsa\s+lokasi", r"legenda", r"wgs", r"skala"
     ],
 }
 
 # Aturan:
 # - Rencana Tapak/Siteplan → wajib ada gambar
-# - Peta Lokasi → wajib ada gambar
+# - Peta Lokasi → wajib ada gambar (dan diverifikasi dengan teks sekitar gambar)
 # - Jadwal Pelaksanaan Kegiatan → wajib ada gambar ATAU tabel
 REQUIREMENTS = [
     {"name": "Informasi Kegiatan", "requires_visual": False, "requires_table": False},
     {"name": "Tujuan", "requires_visual": False, "requires_table": False},
     {"name": "Manfaat", "requires_visual": False, "requires_table": False},
     {"name": "Kegiatan Eksisting Yang Dimohonkan", "requires_visual": False, "requires_table": False},
-    {"name": "Jadwal Pelaksanaan Kegiatan", "requires_visual": True, "requires_table": True},  # salah satu wajib
+    {"name": "Jadwal Pelaksanaan Kegiatan", "requires_visual": True, "requires_table": True},
     {"name": "Rencana Tapak/Siteplan", "requires_visual": True, "requires_table": False},
     {"name": "Deskriptif luasan yang dibutuhkan", "requires_visual": False, "requires_table": False},
     {"name": "Peta Lokasi", "requires_visual": True, "requires_table": False},
@@ -96,7 +96,26 @@ REQUIREMENTS = [
 NUMBER_PATTERN = re.compile(r"(?<!\d)(?:[1-9]\d{0,2}(?:\.\d{3})*|0)?(?:[\.,]\d+)?\s*(?:m2|m\^2|m²|ha|hektar|hektare|meter\s*persegi|m|meter)\b")
 DATE_PATTERN = re.compile(r"\b(\d{1,2}[\-/]?(\d{1,2}|jan|feb|mar|apr|mei|jun|jul|agu|sep|okt|nov|des)[\-/]?\d{2,4}|\bQ[1-4]\b|minggu|bulan|tahun)\b", re.IGNORECASE)
 
-# (sisanya tetap sama seperti versi sebelumnya: fungsi ekstraksi, analisis, UI)
+# --------------------------- Verifikasi Gambar ---------------------------
+def verify_image_with_text(page, keyword_patterns: List[str]) -> bool:
+    """
+    Verifikasi gambar di halaman tertentu dengan memeriksa teks sekitar.
+    Return True jika ada gambar dan ada keyword relevan di teks halaman.
+    """
+    if not fitz:
+        return False
+
+    text = page.get_text("text").lower()
+    has_keyword = any(re.search(pat, text) for pat in keyword_patterns)
+    has_image = len(page.get_images(full=True)) > 0
+
+    return has_image and has_keyword
+
+# --------------------------- Catatan ---------------------------
+# Nanti di fungsi analisis utama, untuk persyaratan "Peta Lokasi" kita ganti pengecekan:
+# bukan hanya cek ada gambar, tapi juga panggil verify_image_with_text(page, KEYWORDS["Peta Lokasi"]).
+# ---------------------------
+
 
 def clean_text(t: str) -> str:
     t = t or ""
