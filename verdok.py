@@ -66,7 +66,7 @@ KEYWORDS = {
         r"luas\s+lahan", r"rincian\s+area", r"kapasitas\s+ruang"
     ],
     "Peta Lokasi": [
-        r"peta\s+lokasi", r"denah\s+lokasi", r"gambar\s+lokasi",
+        r"peta\s+lokasi", r"peta, r"denah\s+lokasi", r"gambar\s+lokasi",
         r"lokasi\s+proyek", r"map", r"posisi\s+geografis",
         r"koordinat\s+lokasi", r"lokasi\s+tapak", r"sketsa\s+lokasi", r"legenda"
     ],
