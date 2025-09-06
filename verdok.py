@@ -100,7 +100,10 @@ DATE_PATTERN = re.compile(r"\b(\d{1,2}[\-/]?\d{1,2}[\-/]?\d{2,4}|\bQ[1-4]\b|ming
 # --------------------------- Segmentasi Dokumen ---------------------------
 def segment_document(text: str) -> Dict[str, str]:
     sections = {r["name"]: "" for r in REQUIREMENTS}
-    heading_pattern = re.compile(r"^(?:\d+(?:\.\d+)*|[A-Z]|BAB\s+\w+)[\.\)]?\s+([A-Za-z].+)$", re.MULTILINE)
+    heading_pattern = re.compile(
+        r"^(?:\d+(?:\.\d+)*|[A-Z]|BAB\s+\w+)[\.\)]?\s+([A-Za-z].+)$",
+        re.MULTILINE,
+    )
 
     matches = list(heading_pattern.finditer(text))
     for i, match in enumerate(matches):
@@ -109,10 +112,19 @@ def segment_document(text: str) -> Dict[str, str]:
         section_text = text[start:end].strip()
 
         heading = match.group(1).strip().lower()
+
+        # hanya mapping jika heading cocok dengan alias salah satu requirement
+        mapped = False
         for req, aliases in SECTION_ALIASES.items():
             if any(alias in heading for alias in aliases):
                 sections[req] = section_text
+                mapped = True
                 break
+
+        # jika heading tidak dikenali aliasnya → abaikan saja
+        if not mapped:
+            continue
+
     return sections
 
 # --------------------------- Ekstraksi PDF ---------------------------
