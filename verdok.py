@@ -246,6 +246,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-bantu saya pecahkan masalah script tersebut, mengapa hasil script menyatakan belum lengkap semua persyaratan pada dokumen tersebut. Padahah jika saya lihat beberapa persyaratan telah lengkap dan sesuai
