@@ -310,7 +310,7 @@ st.set_page_config(page_title="Analisis Kelengkapan Perizinan", page_icon="📄"
 st.title("📄 Dashboard Analisis Kelengkapan & Kesesuaian Dokumen Perizinan")
 
 with st.sidebar:
-    st.header("⚙️ Pengaturan")
+    st.header("⚙️ Pengaturan123578")
     st.markdown(
         """
         Unggah dokumen permohonan izin (PDF), lalu aplikasi akan:
