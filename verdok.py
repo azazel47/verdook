@@ -1,272 +1,156 @@
-# Streamlit Dashboard Analisis Kesesuaian & Kelengkapan Dokumen Perizinan
-# --------------------------------------------------------------
-# Cara pakai:
-# 1) Pastikan Python 3.9+ terpasang.
-# 2) (Opsional) Buat virtualenv, lalu install dependensi:
-#    pip install streamlit pymupdf pdfplumber PyPDF2 pandas numpy
-# 3) Jalankan aplikasi:
-#    streamlit run streamlit_dashboard_kelengkapan_perizinan.py
-# --------------------------------------------------------------
-
-import io
 import re
-from typing import Dict, List, Tuple
-
-import numpy as np
-import pandas as pd
+import fitz  # PyMuPDF
+import pdfplumber
+import PyPDF2
 import streamlit as st
+from typing import List, Dict
 
-# Library PDF opsional: PyMuPDF (fitz) untuk gambar, pdfplumber untuk tabel
-try:
-    import fitz  # PyMuPDF
-except Exception:
-    fitz = None
+# --------------------------- Persyaratan ---------------------------
+REQUIREMENTS = [
+    {"name": "Informasi Kegiatan"},
+    {"name": "Tujuan"},
+    {"name": "Manfaat"},
+    {"name": "Kegiatan Eksisting Yang Dimohonkan"},
+    {"name": "Jadwal Pelaksanaan Kegiatan"},
+    {"name": "Rencana Tapak/Siteplan"},
+    {"name": "Deskriptif Luasan yang Dibutuhkan"},
+    {"name": "Peta Lokasi"},
+]
 
-try:
-    import pdfplumber
-except Exception:
-    pdfplumber = None
-
-try:
-    from PyPDF2 import PdfReader
-except Exception:
-    PdfReader = None
-
-# --------------------------- Util Helpers ---------------------------
+# --------------------------- Keyword Dictionary ---------------------------
 KEYWORDS = {
     "Informasi Kegiatan": [
-        r"informasi\s+kegiatan", r"deskripsi\s+kegiatan", r"gambaran\s+umum",
-        r"kegiatan", r"uraian\s+kegiatan", r"rincian\s+kegiatan", r"gambaran\s+kegiatan",
-        r"profil\s+kegiatan", r"deskripsi\s+kegiatan", r"latar\s+belakang\s+kegiatan",
-        r"ringkasan\s+kegiatan"
+        r"\bkegiatan\b", r"uraian kegiatan", r"rincian kegiatan", r"gambaran kegiatan",
+        r"profil kegiatan", r"deskripsi kegiatan", r"latar belakang kegiatan", r"ringkasan kegiatan"
     ],
     "Tujuan": [
-        r"tujuan", r"maksud", r"sasaran", r"target", r"orientasi", r"objective", r"goal",
-        r"visi", r"misi"
+        r"\btujuan\b", r"\bmaksud\b", r"\bsasaran\b", r"\btarget\b",
+        r"orientasi", r"objective", r"goal", r"visi.?misi"
     ],
     "Manfaat": [
-        r"manfaat", r"kegunaan", r"dampak\s+positif", r"hasil\s+yang\s+diharapkan",
-        r"outcome", r"nilai\s+Tambah", r"keuntungan", r"faedah", r"benefit"
+        r"\bmanfaat\b", r"kegunaan", r"dampak positif", r"hasil.*diharapkan",
+        r"outcome", r"nilai tambah", r"keuntungan", r"faedah", r"benefit"
     ],
     "Kegiatan Eksisting Yang Dimohonkan": [
-        r"kegiatan\s+eksisting", r"yang\s+dimohonkan", r"existing\s+activity",
-        r"aktivitas\s+yang\s+sedang\s+berjalan", r"program\s+berjalan", r"kondisi\s+eksisting",
-        r"rencana\s+kegiatan", r"usulan\s+kegiatan", r"proposal\s+kegiatan",
-        r"permohonan\s+kegiatan", r"aktivitas\s+yang\s+diusulkan"
+        r"kegiatan eksisting", r"aktivitas.*berjalan", r"program berjalan", r"kondisi eksisting",
+        r"rencana kegiatan", r"usulan kegiatan", r"proposal kegiatan", r"permohonan kegiatan", r"aktivitas.*usulkan"
     ],
     "Jadwal Pelaksanaan Kegiatan": [
-        r"jadwal", r"timeline", r"rencana\s+pelaksanaan", r"tahapan",
-        r"rencana\s+waktu", r"schedule", r"perencanaan\s+waktu", r"timeframe",
-        r"tahapan\s+pelaksanaan", r"roadmap", r"matriks\s+waktu"
+        r"jadwal.*pelaksanaan", r"timeline", r"rencana waktu", r"schedule",
+        r"perencanaan waktu", r"timeframe", r"tahapan pelaksanaan", r"roadmap", r"matriks waktu"
     ],
     "Rencana Tapak/Siteplan": [
-        r"site\s*plan|siteplan", r"rencana\s+tapak", r"denah", r"denah\s+tapak",
-        r"gambar\s+tapak", r"layout", r"tata\s+letak", r"masterplan",
-        r"sketsa\s+lokasi", r"peta\s+tapak", r"diagram\s+site"
+        r"rencana tapak", r"siteplan", r"denah tapak", r"gambar tapak", r"layout",
+        r"tata letak", r"masterplan", r"sketsa lokasi", r"peta tapak", r"diagram site"
     ],
-    "Deskriptif luasan yang dibutuhkan": [
-        r"luas(?:an)?", r"meter\s*persegi|m2|m\^2|m²|ha|hektar|hektare",
-        r"dimensi", r"ukuran", r"kebutuhan\s+luas", r"estimasi\s+luas",
-        r"spesifikasi\s+luasan", r"ukuran\s+area", r"kebutuhan\s+lahan",
-        r"luas\s+lahan", r"rincian\s+area", r"kapasitas\s+ruang"
+    "Deskriptif Luasan yang Dibutuhkan": [
+        r"deskriptif luasan", r"kebutuhan luas", r"estimasi luas", r"spesifikasi luasan",
+        r"ukuran area", r"kebutuhan lahan", r"luas lahan", r"rincian area", r"kapasitas ruang",
+        r"\b\d+(\.\d+)?\s*(m2|meter persegi|ha|hektar|hektare)\b"
     ],
     "Peta Lokasi": [
-        r"peta\s+lokasi", r"lokasi", r"map", r"koordinat",
-        r"denah\s+lokasi", r"gambar\s+lokasi", r"lokasi\s+proyek",
-        r"posisi\s+geografis", r"koordinat\s+lokasi", r"lokasi\s+tapak",
-        r"sketsa\s+lokasi"
+        r"peta lokasi", r"denah lokasi", r"gambar lokasi", r"lokasi proyek",
+        r"\bmap\b", r"posisi geografis", r"koordinat lokasi", r"lokasi tapak", r"sketsa lokasi"
     ],
 }
 
-# Aturan:
-REQUIREMENTS = [
-    {"name": "Informasi Kegiatan", "requires_visual": False, "requires_table": False},
-    {"name": "Tujuan", "requires_visual": False, "requires_table": False},
-    {"name": "Manfaat", "requires_visual": False, "requires_table": False},
-    {"name": "Kegiatan Eksisting Yang Dimohonkan", "requires_visual": False, "requires_table": False},
-    {"name": "Jadwal Pelaksanaan Kegiatan", "requires_visual": True, "requires_table": True},
-    {"name": "Rencana Tapak/Siteplan", "requires_visual": True, "requires_table": False},
-    {"name": "Deskriptif luasan yang dibutuhkan", "requires_visual": False, "requires_table": False},
-    {"name": "Peta Lokasi", "requires_visual": True, "requires_table": False},
-]
+# --------------------------- Ekstraksi ---------------------------
+def clean_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip().lower()
 
-NUMBER_PATTERN = re.compile(r"(?<!\d)(?:[1-9]\d{0,2}(?:\.\d{3})*|0)?(?:[\.,]\d+)?\s*(?:m2|m\^2|m²|ha|hektar|hektare|meter\s*persegi|m|meter)\b")
-DATE_PATTERN = re.compile(r"\b(\d{1,2}[\-/]?(\d{1,2}|jan|feb|mar|apr|mei|jun|jul|agu|sep|okt|nov|des)[\-/]?\d{2,4}|\bQ[1-4]\b|minggu|bulan|tahun)\b", re.IGNORECASE)
+def extract_with_pymupdf(file_bytes: bytes):
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+    text_pages, images_per_page = [], {}
+    for i, page in enumerate(doc):
+        text_pages.append(page.get_text("text"))
+        images_per_page[i] = len(page.get_images())
+    return text_pages, images_per_page
 
-# --------------------------- Segmentasi Dokumen ---------------------------
-def segment_document(text: str, requirement_names: List[str]) -> Dict[str, str]:
+def extract_with_pypdf2(file_bytes: bytes):
+    reader = PyPDF2.PdfReader(file_bytes)
+    return [page.extract_text() or "" for page in reader.pages]
+
+def detect_tables_with_pdfplumber(file_bytes: bytes):
+    table_counts = {}
+    with pdfplumber.open(file_bytes) as pdf:
+        for i, page in enumerate(pdf.pages):
+            table_counts[i] = len(page.find_tables())
+    return table_counts
+
+# --------------------------- Segmentasi Bab ---------------------------
+def segment_document(text_pages: List[str],
+                     requirement_names: List[str]) -> Dict[str, Dict]:
     """
     Membagi dokumen ke dalam segmen berdasarkan heading bab.
-    Heading diasumsikan berbentuk "1. Nama Bab" sesuai urutan REQUIREMENTS.
+    Heading dicocokkan dengan daftar keyword di KEYWORDS (lebih fleksibel).
     """
-    sections = {name: "" for name in requirement_names}
+    sections = {name: {"text": "", "pages": []} for name in requirement_names}
+    full_text = "\n".join(text_pages)
 
-    # Regex tangkap pola heading numerik, misalnya "1. Informasi Kegiatan"
     heading_pattern = re.compile(r"^(\d+)\.\s*(.+)$", re.MULTILINE)
-    matches = list(heading_pattern.finditer(text))
+    matches = list(heading_pattern.finditer(full_text))
 
     for i, match in enumerate(matches):
         start = match.end()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-        section_text = text[start:end].strip()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(full_text)
+        section_text = full_text[start:end].strip()
+        heading_text = match.group(2).strip().lower()
 
-        # Normalisasi nama heading
-        heading = match.group(2).strip().lower()
+        matched_req = None
         for req in requirement_names:
-            if req.lower().split()[0] in heading:  # cocokkan kata pertama saja
-                sections[req] = section_text
+            for pat in KEYWORDS.get(req, []):
+                if re.search(pat, heading_text):
+                    matched_req = req
+                    break
+            if matched_req:
                 break
+
+        if matched_req:
+            start_page = full_text[:start].count("\f")
+            end_page = full_text[:end].count("\f")
+            page_range = list(range(start_page, max(start_page+1, end_page+1)))
+
+            sections[matched_req]["text"] = section_text
+            sections[matched_req]["pages"] = page_range
 
     return sections
 
-# --------------------------- Verifikasi Gambar ---------------------------
-def verify_image_with_text(page, keyword_patterns: List[str]) -> bool:
-    """
-    Verifikasi gambar di halaman tertentu dengan memeriksa teks sekitar.
-    Return True jika ada gambar dan ada keyword relevan di teks halaman.
-    """
-    if not fitz:
-        return False
-
-    text = page.get_text("text").lower()
-    has_keyword = any(re.search(pat, text) for pat in keyword_patterns)
-    has_image = len(page.get_images(full=True)) > 0
-
-    return has_image and has_keyword
-
-# --------------------------- Catatan ---------------------------
-# Dengan segmentasi ini, analisis keyword/gambar dilakukan hanya pada teks yang 
-# berada di bab sesuai urutan REQUIREMENTS. Jadi "m2" di bab 1 tidak lagi dianggap 
-# memenuhi syarat bab 7 Deskriptif Luasan.
-# ---------------------------
-
-# --------------------------- Catatan ---------------------------
-# Nanti di fungsi analisis utama, untuk persyaratan "Peta Lokasi" kita ganti pengecekan:
-# bukan hanya cek ada gambar, tapi juga panggil verify_image_with_text(page, KEYWORDS["Peta Lokasi"]).
-# ---------------------------
-
-
-def clean_text(t: str) -> str:
-    t = t or ""
-    t = re.sub(r"\s+", " ", t)
-    return t.strip().lower()
-
-
-def find_keyword_hits(text_pages: List[str], patterns: List[str]) -> Dict[int, List[str]]:
+# --------------------------- Analisis ---------------------------
+def find_keyword_hits(texts: List[str], patterns: List[str]) -> Dict[int, List[str]]:
     hits = {}
-    for i, page_text in enumerate(text_pages):
-        low = page_text.lower()
-        matched = []
-        for p in patterns:
-            if re.search(p, low):
-                matched.append(p)
-        if matched:
-            hits[i] = matched
+    for i, text in enumerate(texts):
+        for pat in patterns:
+            if re.search(pat, text, re.IGNORECASE):
+                hits.setdefault(i, []).append(pat)
     return hits
 
-
-def extract_with_pymupdf(file_bytes: bytes) -> Tuple[List[str], Dict[int, int]]:
-    text_pages = []
-    images_per_page = {}
-    if fitz is None:
-        return text_pages, images_per_page
-    doc = fitz.open(stream=file_bytes, filetype="pdf")
-    for i, page in enumerate(doc):
-        text_pages.append(page.get_text("text") or "")
-        images_per_page[i] = len(page.get_images(full=True))
-    return text_pages, images_per_page
-
-
-def extract_with_pypdf2(file_bytes: bytes) -> List[str]:
-    text_pages = []
-    if PdfReader is None:
-        return text_pages
-    reader = PdfReader(io.BytesIO(file_bytes))
-    for page in reader.pages:
-        try:
-            text_pages.append(page.extract_text() or "")
-        except Exception:
-            text_pages.append("")
-    return text_pages
-
-
-def detect_tables_with_pdfplumber(file_bytes: bytes) -> Dict[int, int]:
-    table_counts = {}
-    if pdfplumber is None:
-        return table_counts
-    with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-        for i, page in enumerate(pdf.pages):
-            try:
-                tables = page.find_tables() or []
-                table_counts[i] = len(tables)
-            except Exception:
-                table_counts[i] = 0
-    return table_counts
-
-
-def score_requirement(name: str,
-                      keyword_hits: Dict[int, List[str]],
+def score_requirement(name: str, keyword_hits: Dict[int, List[str]],
                       images_per_page: Dict[int, int],
-                      table_counts: Dict[int, int],
-                      text_pages: List[str]) -> Dict:
-    requires_visual = next(r for r in REQUIREMENTS if r["name"] == name)["requires_visual"]
-    requires_table = next(r for r in REQUIREMENTS if r["name"] == name)["requires_table"]
+                      tables_per_page: Dict[int, int],
+                      segment_texts: List[str]) -> Dict:
+    has_keyword = bool(keyword_hits)
+    has_image, has_table = any(v > 0 for v in images_per_page.values()), any(v > 0 for v in tables_per_page.values())
 
-    found_text = len(keyword_hits) > 0
-    pages_with_text = sorted(keyword_hits.keys())
-
-    def _sum_counts(indices: List[int], mapping: Dict[int, int]):
-        return sum(mapping.get(i, 0) for i in indices)
-
-    visual_on_same = _sum_counts(pages_with_text, images_per_page)
-    tables_on_same = _sum_counts(pages_with_text, table_counts)
-
-    any_visual = sum(images_per_page.values()) if images_per_page else 0
-    any_table = sum(table_counts.values()) if table_counts else 0
-
-    visual_ok = (visual_on_same > 0) or (not pages_with_text and any_visual > 0) if requires_visual else True
-    table_ok = (tables_on_same > 0) or (not pages_with_text and any_table > 0) if requires_table else True
-
-    notes = []
-    evidence_pages = pages_with_text[:3]
-
-    if name == "Deskriptif luasan yang dibutuhkan":
-        area_hits = {}
-        for i, t in enumerate(text_pages):
-            if re.search(NUMBER_PATTERN, t.lower()):
-                area_hits[i] = True
-        if area_hits:
-            evidence_pages = sorted(set(evidence_pages + list(area_hits.keys())[:2]))
-        else:
-            notes.append("Tidak ditemukan angka + satuan (m²/m2/meter persegi).")
-
+    status = "❌ Tidak Ada"
     if name == "Jadwal Pelaksanaan Kegiatan":
-        got_dateword = False
-        for i in pages_with_text:
-            if re.search(DATE_PATTERN, text_pages[i].lower()):
-                got_dateword = True
-                break
-        if not got_dateword:
-            notes.append("Pertimbangkan menambahkan tanggal/periode/quarter pada jadwal.")
-
-    status = found_text and visual_ok and table_ok
-
-    if requires_visual and not visual_ok:
-        notes.append("Wajib menyertakan gambar pada bagian ini (idealnya pada halaman yang sama).")
-    if requires_table and not table_ok:
-        notes.append("Wajib menyertakan tabel pada bagian ini (idealnya pada halaman yang sama).")
-    if not found_text:
-        notes.append("Kata kunci terkait belum ditemukan.")
+        if has_keyword and (has_image or has_table):
+            status = "✅ Lengkap"
+        elif has_keyword:
+            status = "⚠️ Ada teks, tidak ada gambar/tabel"
+    elif name in ["Rencana Tapak/Siteplan", "Peta Lokasi"]:
+        if has_keyword and has_image:
+            status = "✅ Lengkap"
+        elif has_keyword:
+            status = "⚠️ Ada teks, tidak ada gambar"
+    else:
+        if has_keyword:
+            status = "✅ Lengkap"
 
     return {
         "Persyaratan": name,
-        "Ditemukan Teks": "✅" if found_text else "❌",
-        "Ada Gambar/Tabel (Jika Wajib)": "✅" if (visual_ok and table_ok) else "❌" if (requires_visual or requires_table) else "N/A",
-        "Status": "✅ LENGKAP" if status else "❌ BELUM LENGKAP",
-        "Catatan": "; ".join(notes) if notes else "",
-        "Halaman Bukti (perkiraan, 1-based)": ", ".join(str(i+1) for i in evidence_pages) if evidence_pages else "-",
+        "Status": status,
+        "Keyword ditemukan": ", ".join(set(k for v in keyword_hits.values() for k in v)) or "-",
     }
-
 
 def analyze_pdf(file_bytes: bytes) -> Dict:
     text_pages, images_per_page = extract_with_pymupdf(file_bytes)
@@ -275,12 +159,26 @@ def analyze_pdf(file_bytes: bytes) -> Dict:
     table_counts = detect_tables_with_pdfplumber(file_bytes)
     text_pages = [clean_text(t) for t in text_pages]
 
+    sections = segment_document(text_pages, [r["name"] for r in REQUIREMENTS])
+
     results = []
     for req in REQUIREMENTS:
         name = req["name"]
-        patterns = KEYWORDS.get(name, [])
-        hits = find_keyword_hits(text_pages, patterns)
-        row = score_requirement(name, hits, images_per_page, table_counts, text_pages)
+        seg = sections.get(name, {"text": "", "pages": []})
+
+        hits = find_keyword_hits([seg["text"]], KEYWORDS.get(name, [])) if seg["text"] else {}
+
+        row = score_requirement(
+            name,
+            hits,
+            {p: images_per_page.get(p, 0) for p in seg["pages"]},
+            {p: table_counts.get(p, 0) for p in seg["pages"]},
+            [text_pages[p] for p in seg["pages"]] if seg["pages"] else []
+        )
+
+        row["Halaman Bukti (perkiraan, 1-based)"] = (
+            ", ".join(str(p+1) for p in seg["pages"]) if seg["pages"] else "-"
+        )
         results.append(row)
 
     total_req = len(results)
@@ -303,100 +201,20 @@ def analyze_pdf(file_bytes: bytes) -> Dict:
         },
     }
 
+# --------------------------- Streamlit UI ---------------------------
+def main():
+    st.title("📑 Dashboard Analisis Kesesuaian & Kelengkapan Dokumen Perizinan")
+    uploaded_file = st.file_uploader("Upload dokumen PDF", type=["pdf"])
 
-# --------------------------- UI ---------------------------
-st.set_page_config(page_title="Analisis Kelengkapan Perizinan", page_icon="📄", layout="wide")
+    if uploaded_file:
+        with st.spinner("Menganalisis dokumen..."):
+            analysis = analyze_pdf(uploaded_file.read())
 
-st.title("📄 Dashboard Analisis Kelengkapan & Kesesuaian Dokumen Perizinan")
+        st.subheader("📊 Hasil Analisis")
+        st.table(analysis["results"])
 
-with st.sidebar:
-    st.header("⚙️ Pengaturan123578")
-    st.markdown(
-        """
-        Unggah dokumen permohonan izin (PDF), lalu aplikasi akan:
-        1) Mengekstrak teks, gambar, dan tabel.
-        2) Memeriksa kelengkapan berdasarkan daftar persyaratan.
-        3) Menyajikan checklist hasil analisis dan ringkasan.
+        st.subheader("📈 Statistik Dokumen")
+        st.json(analysis["stats"])
 
-        **Catatan:** Deteksi bersifat *heuristic*. Silakan tinjau catatan pada tiap persyaratan.
-        """
-    )
-
-uploaded = st.file_uploader("Unggah PDF dokumen permohonan izin", type=["pdf"]) 
-
-if uploaded is None:
-    st.info("Silakan unggah file PDF untuk mulai analisis.")
-    st.stop()
-
-file_bytes = uploaded.read()
-
-with st.spinner("Menganalisis dokumen..."):
-    try:
-        output = analyze_pdf(file_bytes)
-    except Exception as e:
-        st.error(f"Gagal menganalisis PDF: {e}")
-        st.stop()
-
-st.subheader("Ringkasan Dokumen")
-col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric("Halaman", output["stats"].get("Jumlah Halaman", 0))
-col2.metric("Kata (≈)", output["stats"].get("Jumlah Kata (perkiraan)", 0))
-col3.metric("Gambar", output["stats"].get("Jumlah Gambar (terdeteksi)", 0))
-col4.metric("Tabel", output["stats"].get("Jumlah Tabel (terdeteksi)", 0))
-col5.metric("Kelengkapan", f"{output['stats'].get('Kompleteness %', 0.0)}%")
-
-st.subheader("Checklist Kelengkapan & Kesesuaian")
-df = pd.DataFrame(output["results"]) 
-
-status_colors = {"✅ LENGKAP": "#22c55e", "❌ BELUM LENGKAP": "#ef4444"}
-
-def style_df(d: pd.DataFrame):
-    styler = d.style.format(na_rep="-")
-    styler = styler.apply(lambda s: [
-        "background-color: %s; color: white; font-weight: 700" % status_colors.get(v, "") if s.name == "Status" else ""
-        for v in s
-    ])
-    return styler
-
-st.dataframe(style_df(df), use_container_width=True, hide_index=True)
-
-st.subheader("Tinjauan Per Persyaratan")
-for idx, row in df.iterrows():
-    ok = row["Status"].startswith("✅")
-    with st.expander(f"{row['Persyaratan']} — {'✅' if ok else '❌'}"):
-        c1, c2, c3 = st.columns([2, 2, 3])
-        c1.checkbox(
-            "Teks terkait ditemukan",
-            value=(row["Ditemukan Teks"] == "✅"),
-            disabled=True,
-            key=f"text_{idx}_{row['Persyaratan']}"
-        )
-        req_visual_table = row["Ada Gambar/Tabel (Jika Wajib)"]
-        c2.checkbox(
-            "Gambar/Tabel sesuai (jika wajib)",
-            value=(req_visual_table == "✅"),
-            disabled=True,
-            key=f"visual_{idx}_{row['Persyaratan']}"
-        )
-        c3.markdown(f"**Status:** {row['Status']}  ")
-        if row["Catatan"]:
-            st.warning(row["Catatan"])
-        st.caption(f"Halaman bukti (perkiraan): {row['Halaman Bukti (perkiraan, 1-based)']}")
-
-st.subheader("Ekspor Hasil")
-report = {
-    "metadata": {
-        "filename": uploaded.name,
-    },
-    "stats": output["stats"],
-    "results": output["results"],
-}
-
-st.download_button(
-    label="⬇️ Unduh Laporan (JSON)",
-    data=pd.Series(report).to_json(force_ascii=False, indent=2),
-    file_name=f"laporan_kelengkapan_{uploaded.name.replace('.pdf','')}.json",
-    mime="application/json",
-)
-
-st.success("Analisis selesai. Silakan tinjau hasil dan catatan untuk perbaikan dokumen.")
+if __name__ == "__main__":
+    main()
