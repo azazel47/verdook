@@ -93,23 +93,36 @@ def segment_document(text: str, doc) -> Dict[str, str]:
     sections = {r["name"]: "" for r in REQUIREMENTS}
     headings_found = []
 
-    # Loop setiap halaman untuk mendeteksi heading bold
     for page_num, page in enumerate(doc):
         blocks = page.get_text("dict")["blocks"]
         for b in blocks:
             if "lines" not in b:
                 continue
             for l in b["lines"]:
-                for s in l["spans"]:
-                    if s.get("flags", 0) & 2:  # flag 2 biasanya = bold
-                        heading_text = s["text"].strip().lower()
-                        for req, aliases in SECTION_ALIASES.items():
-                            if any(alias in heading_text for alias in aliases):
-                                headings_found.append((req, page_num, s["bbox"]))
+                # Gabungkan semua span di satu baris
+                line_text = " ".join([s["text"] for s in l["spans"]]).strip().lower()
 
-    # Buat segmentasi dari heading -> heading berikutnya
+                # Bersihkan numbering di depan (contoh: 1., 1.1., A., II.)
+                clean_text = re.sub(r"^(\d+(\.\d+)*\.?|[ivxlcdm]+\.?|[a-zA-Z]\.)\s*", "", line_text)
+
+                # Kalau mau heading hanya bold → aktifkan ini
+                is_bold = any(s.get("flags", 0) & 2 for s in l["spans"])
+                # Kalau sub-bab juga perlu, boleh nonaktifkan filter bold
+                # if not is_bold:
+                #     continue
+
+                for req, aliases in SECTION_ALIASES.items():
+                    for alias in aliases:
+                        if re.search(alias, clean_text, re.IGNORECASE):
+                            headings_found.append((req, page_num, l["bbox"]))
+                            break
+
+    # Segmentasi heading -> heading berikutnya
     for i, (req, page_num, bbox) in enumerate(headings_found):
-        end_page, end_bbox = (headings_found[i+1][1], headings_found[i+1][2]) if i+1 < len(headings_found) else (len(doc)-1, None)
+        end_page, end_bbox = (
+            (headings_found[i+1][1], headings_found[i+1][2]) 
+            if i+1 < len(headings_found) else (len(doc)-1, None)
+        )
         content_parts = []
         for p in range(page_num, end_page+1):
             page = doc[p]
