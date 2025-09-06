@@ -100,7 +100,7 @@ DATE_PATTERN = re.compile(r"\b(\d{1,2}[\-/]?\d{1,2}[\-/]?\d{2,4}|\bQ[1-4]\b|ming
 # --------------------------- Segmentasi Dokumen ---------------------------
 def segment_document(text: str) -> Dict[str, str]:
     sections = {r["name"]: "" for r in REQUIREMENTS}
-    heading_pattern = re.compile(r"^(\d+(?:\.\d+)*)\s+([A-Za-z].+)$", re.MULTILINE)
+    heading_pattern = re.compile(r"^(?:\d+(?:\.\d+)*|[A-Z]|BAB\s+\w+)[\.\)]?\s+([A-Za-z].+)$", re.MULTILINE)
 
     matches = list(heading_pattern.finditer(text))
     for i, match in enumerate(matches):
