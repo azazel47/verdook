@@ -1,7 +1,6 @@
 import io
 import re
-from typing import Dict, List, Tuple
-import numpy as np
+from typing import Dict, List
 import pandas as pd
 import streamlit as st
 
@@ -22,11 +21,9 @@ except Exception:
 
 # --------------------------- Keyword Persyaratan ---------------------------
 KEYWORDS = {
-    "Informasi Kegiatan": [
-        r"informasi\s+kegiatan", r"rencana\s+kegiatan", r"uraian\s+kegiatan",
-        r"rincian\s+kegiatan", r"gambaran\s+kegiatan", r"profil\s+kegiatan",
-        r"deskripsi\s+kegiatan", r"latar\s+belakang\s+kegiatan", r"ringkasan\s+kegiatan"
-        r"ruang\s+laut", r"fasilitas", r"nama"
+    "Informasi Pemohon": [
+        r"informasi\s+kegiatan", r"informasi\s+pemohon", r"rencana\s+kegiatan",
+        r"uraian\s+kegiatan", r"profil", r"nama", r"alamat"
     ],
     "Tujuan": [
         r"tujuan", r"maksud", r"sasaran", r"target", r"orientasi",
@@ -38,25 +35,23 @@ KEYWORDS = {
     ],
     "Kegiatan Eksisting Yang Dimohonkan": [
         r"kegiatan\s+eksisting", r"kegiatan\s+eksisting\s+yang\s+dimohonkan",
-        r"aktivitas\s+yang\s+sedang\s+berjalan",
-        r"program\s+berjalan", r"kondisi\s+eksisting", r"rencana\s+kegiatan",
+        r"aktivitas\s+yang\s+sedang\s+berjalan", r"kondisi\s+eksisting",
         r"usulan\s+kegiatan", r"proposal\s+kegiatan", r"permohonan\s+kegiatan",
-        r"aktivitas\s+yang\s+diusulkan", r"pembangunan", r"fasilitas"
+        r"pembangunan", r"fasilitas"
     ],
     "Jadwal Pelaksanaan Kegiatan": [
-        r"jadwal", r"timeline", r"rencana\s+waktu", r"schedule", r"perencanaan\s+waktu",
-        r"timeframe", r"tahapan\s+pelaksanaan", r"roadmap", r"matriks\s+waktu"
+        r"jadwal", r"timeline", r"rencana\s+waktu", r"schedule",
+        r"tahapan\s+pelaksanaan", r"roadmap", r"matriks\s+waktu"
     ],
     "Rencana Tapak/Siteplan": [
-        r"site\s*plan|siteplan", r"rencana\s+tapak", r"denah", r"denah\s+tapak",
-        r"gambar\s+tapak", r"layout", r"tata\s+letak", r"masterplan",
-        r"sketsa\s+lokasi", r"peta\s+tapak", r"diagram\s+site"
+        r"site\s*plan|siteplan", r"rencana\s+tapak", r"denah",
+        r"gambar\s+tapak", r"layout", r"masterplan",
+        r"peta\s+tapak", r"diagram\s+site"
     ],
     "Deskriptif Luasan yang Dibutuhkan": [
         r"luas(?:an)?", r"meter\s*persegi|m2|m\^2|m²|ha|hektar|hektare",
         r"dimensi", r"ukuran", r"kebutuhan\s+luas", r"estimasi\s+luas",
-        r"spesifikasi\s+luasan", r"ukuran\s+area", r"kebutuhan\s+lahan",
-        r"luas\s+lahan", r"rincian\s+area", r"kapasitas\s+ruang"
+        r"spesifikasi\s+luasan", r"luas\s+lahan", r"kapasitas\s+ruang"
     ],
     "Peta Lokasi": [
         r"peta\s+lokasi", r"denah\s+lokasi", r"gambar\s+lokasi",
@@ -65,9 +60,8 @@ KEYWORDS = {
     ],
 }
 
-
 SECTION_ALIASES = {
-    "Informasi Kegiatan": ["informasi kegiatan", "rencana kegiatan.*", "informasi pemohon"],
+    "Informasi Pemohon": ["informasi kegiatan", "rencana kegiatan", "informasi pemohon"],
     "Tujuan": ["tujuan", "maksud"],
     "Manfaat": ["manfaat"],
     "Kegiatan Eksisting Yang Dimohonkan": ["kegiatan eksisting", "usulan kegiatan"],
@@ -89,9 +83,11 @@ REQUIREMENTS = [
 ]
 
 # --------------------------- Segmentasi Dokumen ---------------------------
-def segment_document(text: str, doc) -> Dict[str, str]:
+def segment_document(doc) -> Dict[str, str]:
     sections = {r["name"]: "" for r in REQUIREMENTS}
     headings_found = []
+
+    numbering_pattern = r"^(\d+(\.\d+)*\.?|[ivxlcdm]+\.?|[a-zA-Z]\.)\s*"
 
     for page_num, page in enumerate(doc):
         blocks = page.get_text("dict")["blocks"]
@@ -99,35 +95,38 @@ def segment_document(text: str, doc) -> Dict[str, str]:
             if "lines" not in b:
                 continue
             for l in b["lines"]:
-                # Gabungkan semua span di satu baris
-                line_text = " ".join([s["text"] for s in l["spans"]]).strip().lower()
+                line_text = " ".join([s["text"] for s in l["spans"]]).strip()
 
-                # Bersihkan numbering di depan (contoh: 1., 1.1., A., II.)
-                clean_text = re.sub(r"^(\d+(\.\d+)*\.?|[ivxlcdm]+\.?|[a-zA-Z]\.)\s*", "", line_text)
-
-                # Kalau mau heading hanya bold → aktifkan ini
+                # Harus bold
                 is_bold = any(s.get("flags", 0) & 2 for s in l["spans"])
-                # Kalau sub-bab juga perlu, boleh nonaktifkan filter bold
-                # if not is_bold:
-                #     continue
+                if not is_bold:
+                    continue
+
+                # Harus ada numbering
+                if not re.match(numbering_pattern, line_text, re.IGNORECASE):
+                    continue
+
+                clean_text = re.sub(numbering_pattern, "", line_text).lower()
 
                 for req, aliases in SECTION_ALIASES.items():
                     for alias in aliases:
-                        if re.search(alias, clean_text, re.IGNORECASE):
-                            headings_found.append((req, page_num, l["bbox"]))
+                        alias_lower = alias.lower()
+                        if clean_text.startswith(alias_lower):  # prefix match
+                            match_number = re.match(numbering_pattern, line_text).group(0)
+                            formatted_heading = f"{match_number}{alias}"
+                            headings_found.append((req, page_num, l["bbox"], formatted_heading))
                             break
 
-    # Segmentasi heading -> heading berikutnya
-    for i, (req, page_num, bbox) in enumerate(headings_found):
-        end_page, end_bbox = (
-            (headings_found[i+1][1], headings_found[i+1][2]) 
+    # Segmentasi antar heading
+    for i, (req, page_num, bbox, heading_text) in enumerate(headings_found):
+        end_page, _ = (
+            (headings_found[i+1][1], headings_found[i+1][2])
             if i+1 < len(headings_found) else (len(doc)-1, None)
         )
         content_parts = []
         for p in range(page_num, end_page+1):
             page = doc[p]
-            page_text = page.get_text("text")
-            content_parts.append(page_text)
+            content_parts.append(page.get_text("text"))
         sections[req] = "\n".join(content_parts)
 
     return sections
@@ -175,31 +174,34 @@ def analyze_pdf(file_bytes: bytes) -> Dict:
         return {"results": [], "stats": {}}
 
     table_counts = detect_tables_with_pdfplumber(file_bytes)
-
-    full_text = "\n".join(text_pages).lower()
-    segmented = segment_document(full_text, doc)
+    segmented = segment_document(doc)
 
     results = []
     for req in REQUIREMENTS:
         name = req["name"]
-        segment_text = segmented.get(name, "")
+        segment_text = segmented.get(name, "").lower()
         found_text = any(re.search(p, segment_text) for p in KEYWORDS.get(name, []))
 
-        visual_ok, table_ok, notes = True, True, []
-        if req["requires_visual"] and sum(images_per_page.values()) == 0:
-            visual_ok = False
-            notes.append("Wajib menyertakan gambar.")
-        if req["requires_table"] and sum(table_counts.values()) == 0:
-            table_ok = False
-            notes.append("Wajib menyertakan tabel.")
-        if not found_text:
-            notes.append("Kata kunci tidak ditemukan.")
+        # Default nilai
+        visual_ok, table_ok = True, True
 
-        status = found_text and visual_ok and table_ok
+        if name in ["Jadwal Pelaksanaan Kegiatan", "Rencana Tapak/Siteplan", "Peta Lokasi"]:
+            # Wajib cek gambar/tabel
+            if req["requires_visual"] and sum(images_per_page.values()) == 0:
+                visual_ok = False
+            if req["requires_table"] and sum(table_counts.values()) == 0:
+                table_ok = False
+            status = found_text and visual_ok and table_ok
+        else:
+            # Hanya cek teks, gambar/tabel tidak mempengaruhi status
+            status = found_text
+            visual_ok = sum(images_per_page.values()) > 0
+            table_ok = sum(table_counts.values()) > 0
+
         results.append({
             "Persyaratan": name,
             "Ditemukan Teks": "✅" if found_text else "❌",
-            "Ada Gambar/Tabel (Jika Wajib)": "✅" if (visual_ok and table_ok) else "❌" if (req["requires_visual"] or req["requires_table"]) else "N/A",
+            "Ada Gambar/Tabel (Jika Wajib)": "✅" if (visual_ok or table_ok) else "❌",
             "Status": "✅ LENGKAP" if status else "❌ BELUM LENGKAP",
         })
 
@@ -223,7 +225,7 @@ def main():
 
     with st.sidebar:
         st.header("⚙️ Pengaturan")
-        st.info("Unggah dokumen PDF, sistem akan memeriksa kelengkapan bab.")
+        st.info("Unggah dokumen PDF, sistem akan memeriksa kelengkapan bab/subbab sesuai aturan.")
 
     uploaded_file = st.file_uploader("Unggah PDF", type=["pdf"])
     if uploaded_file is None:
