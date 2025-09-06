@@ -78,7 +78,7 @@ SECTION_ALIASES = {
 }
 
 REQUIREMENTS = [
-    {"name": "Informasi Kegiatan", "requires_visual": False, "requires_table": False},
+    {"name": "Informasi Pemohon", "requires_visual": False, "requires_table": False},
     {"name": "Tujuan", "requires_visual": False, "requires_table": False},
     {"name": "Manfaat", "requires_visual": False, "requires_table": False},
     {"name": "Kegiatan Eksisting Yang Dimohonkan", "requires_visual": False, "requires_table": False},
