@@ -105,11 +105,18 @@ def segment_document(doc) -> Dict[str, str]:
                 for req, aliases in SECTION_ALIASES.items():
                     for alias in aliases:
                         alias_lower = alias.lower()
-                        # cari substring, bukan harus diawali
+
+                        # cek apakah alias ada dalam teks
                         if alias_lower in clean_text:
-                            headings_found.append((req, page_num, l["bbox"], line_text))
-                            headings[req] = line_text
-                            break
+                            # cek apakah ada span bold
+                            is_bold = any(
+                                (s.get("flags", 0) & 2) or ("bold" in s.get("font", "").lower())
+                                for s in l["spans"]
+                            )
+                            if is_bold:
+                                headings_found.append((req, page_num, l["bbox"], line_text))
+                                headings[req] = line_text
+                                break
 
     # Segmentasi antar heading
     for i, (req, page_num, bbox, heading_text) in enumerate(headings_found):
@@ -124,8 +131,6 @@ def segment_document(doc) -> Dict[str, str]:
         sections[req] = "\n".join(content_parts)
 
     return sections, headings
-
-
 
 # --------------------------- Ekstraksi PDF ---------------------------
 def extract_with_pymupdf(file_bytes: bytes):
