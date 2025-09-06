@@ -46,7 +46,7 @@ KEYWORDS = {
         r"aktivitas\s+yang\s+sedang\s+berjalan",
         r"program\s+berjalan", r"kondisi\s+eksisting", r"rencana\s+kegiatan",
         r"usulan\s+kegiatan", r"proposal\s+kegiatan", r"permohonan\s+kegiatan",
-        r"aktivitas\s+yang\s+diusulkan", r"lingkungan\s+kepentingan"
+        r"aktivitas\s+yang\s+diusulkan", r"pembangunan", r"fasilitas"
     ],
     "Jadwal Pelaksanaan Kegiatan": [
         r"jadwal", r"timeline", r"rencana\s+waktu", r"schedule", r"perencanaan\s+waktu",
