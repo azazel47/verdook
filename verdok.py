@@ -32,7 +32,6 @@ KEYWORDS = {
         r"informasi\s+kegiatan", r"rencana\s+kegiatan", r"uraian\s+kegiatan",
         r"rincian\s+kegiatan", r"gambaran\s+kegiatan", r"profil\s+kegiatan",
         r"deskripsi\s+kegiatan", r"latar\s+belakang\s+kegiatan", r"ringkasan\s+kegiatan"
-        r"ruang\s+laut"
     ],
     "Tujuan": [
         r"tujuan", r"maksud", r"sasaran", r"target", r"orientasi",
@@ -43,11 +42,10 @@ KEYWORDS = {
         r"outcome", r"nilai\s+Tambah", r"keuntungan", r"faedah", r"benefit"
     ],
     "Kegiatan Eksisting Yang Dimohonkan": [
-        r"kegiatan\s+eksisting", r"kegiatan\s+eksisting\s+yang\s+dimohonkan",
-        r"aktivitas\s+yang\s+sedang\s+berjalan",
+        r"kegiatan\s+eksisting", r"aktivitas\s+yang\s+sedang\s+berjalan",
         r"program\s+berjalan", r"kondisi\s+eksisting", r"rencana\s+kegiatan",
         r"usulan\s+kegiatan", r"proposal\s+kegiatan", r"permohonan\s+kegiatan",
-        r"aktivitas\s+yang\s+diusulkan", r"pembangunan", r"fasilitas"
+        r"aktivitas\s+yang\s+diusulkan"
     ],
     "Jadwal Pelaksanaan Kegiatan": [
         r"jadwal", r"timeline", r"rencana\s+waktu", r"schedule", r"perencanaan\s+waktu",
@@ -76,11 +74,11 @@ SECTION_ALIASES = {
     "Informasi Kegiatan": ["informasi kegiatan", "rencana kegiatan"],
     "Tujuan": ["tujuan", "maksud"],
     "Manfaat": ["manfaat"],
-    "Kegiatan Eksisting Yang Dimohonkan": ["kegiatan eksisting", "kegiatan eksisting yang dimohonkan", "usulan kegiatan"],
+    "Kegiatan Eksisting Yang Dimohonkan": ["kegiatan eksisting", "usulan kegiatan"],
     "Jadwal Pelaksanaan Kegiatan": ["jadwal", "timeline"],
     "Rencana Tapak/Siteplan": ["siteplan", "rencana tapak", "denah"],
     "Deskriptif Luasan yang Dibutuhkan": ["luasan", "luas", "kebutuhan lahan"],
-    "Peta Lokasi": ["peta lokasi", "denah lokasi", "lokasi kegiatan"],
+    "Peta Lokasi": ["peta lokasi", "denah lokasi", "lokasi proyek"],
 }
 
 REQUIREMENTS = [
@@ -100,7 +98,7 @@ DATE_PATTERN = re.compile(r"\b(\d{1,2}[\-/]?\d{1,2}[\-/]?\d{2,4}|\bQ[1-4]\b|ming
 # --------------------------- Segmentasi Dokumen ---------------------------
 def segment_document(text: str) -> Dict[str, str]:
     sections = {r["name"]: "" for r in REQUIREMENTS}
-    heading_pattern = re.compile(r"^(?:\d+(?:\.\d+)*|[A-Z]|)[\.\)]?\s+([A-Za-z].+)$", re.MULTILINE)
+    heading_pattern = re.compile(r"^(\d+(?:\.\d+)*)\s+([A-Za-z].+)$", re.MULTILINE)
 
     matches = list(heading_pattern.finditer(text))
     for i, match in enumerate(matches):
@@ -108,7 +106,7 @@ def segment_document(text: str) -> Dict[str, str]:
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         section_text = text[start:end].strip()
 
-        heading = match.group(1).strip().lower()
+        heading = match.group(2).strip().lower()
         for req, aliases in SECTION_ALIASES.items():
             if any(alias in heading for alias in aliases):
                 sections[req] = section_text
@@ -186,6 +184,8 @@ def analyze_pdf(file_bytes: bytes) -> Dict:
             "Ditemukan Teks": "✅" if found_text else "❌",
             "Ada Gambar/Tabel (Jika Wajib)": "✅" if (visual_ok and table_ok) else "❌" if (req["requires_visual"] or req["requires_table"]) else "N/A",
             "Status": "✅ LENGKAP" if status else "❌ BELUM LENGKAP",
+            "Catatan": "; ".join(notes) if notes else "",
+            "Halaman Bukti (perkiraan)": "-",  # opsional: bisa ditambahkan jika perlu mapping page
         })
 
     total_req = len(results)
