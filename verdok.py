@@ -98,7 +98,7 @@ def segment_document(text: str, requirement_names: List[str]) -> Dict[str, Dict]
     Heading dicocokkan dengan KEYWORDS agar fleksibel.
     """
     sections = {name: {"text": "", "pages": []} for name in requirement_names}
-    heading_pattern = re.compile(r"^(\d+)\.\s*(.+)$", re.MULTILINE)
+    heading_pattern = re.compile(r"^(\d+(?:\.\d+)*)\s+([A-Za-z].+)$", re.MULTILINE)
     matches = list(heading_pattern.finditer(text))
 
     for i, match in enumerate(matches):
