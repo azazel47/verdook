@@ -231,7 +231,8 @@ def main():
     col5.metric("Kelengkapan", f"{stats['Kompleteness %']}%")
 
     st.subheader("Checklist Kelengkapan & Kesesuaian")
-    st.dataframe(results, use_container_width=True, hide_index=True)
+    st.dataframe(results, width="stretch", hide_index=True)
+
 
 if __name__ == "__main__":
     main()
