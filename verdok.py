@@ -79,7 +79,7 @@ SECTION_ALIASES = {
     "Jadwal Pelaksanaan Kegiatan": ["jadwal", "timeline"],
     "Rencana Tapak/Siteplan": ["siteplan", "rencana tapak", "denah"],
     "Deskriptif Luasan yang Dibutuhkan": ["luasan", "luas", "kebutuhan lahan"],
-    "Peta Lokasi": ["peta lokasi", "denah lokasi", "lokasi proyek"],
+    "Peta Lokasi": ["peta lokasi", "denah lokasi", "lokasi kegiatan"],
 }
 
 REQUIREMENTS = [
