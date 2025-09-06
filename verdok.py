@@ -74,14 +74,11 @@ KEYWORDS = {
         r"peta\s+lokasi", r"lokasi", r"map", r"koordinat",
         r"denah\s+lokasi", r"gambar\s+lokasi", r"lokasi\s+proyek",
         r"posisi\s+geografis", r"koordinat\s+lokasi", r"lokasi\s+tapak",
-        r"sketsa\s+lokasi", r"legenda", r"wgs", r"skala"
+        r"sketsa\s+lokasi"
     ],
 }
 
 # Aturan:
-# - Rencana Tapak/Siteplan → wajib ada gambar
-# - Peta Lokasi → wajib ada gambar (dan diverifikasi dengan teks sekitar gambar)
-# - Jadwal Pelaksanaan Kegiatan → wajib ada gambar ATAU tabel
 REQUIREMENTS = [
     {"name": "Informasi Kegiatan", "requires_visual": False, "requires_table": False},
     {"name": "Tujuan", "requires_visual": False, "requires_table": False},
@@ -95,6 +92,32 @@ REQUIREMENTS = [
 
 NUMBER_PATTERN = re.compile(r"(?<!\d)(?:[1-9]\d{0,2}(?:\.\d{3})*|0)?(?:[\.,]\d+)?\s*(?:m2|m\^2|m²|ha|hektar|hektare|meter\s*persegi|m|meter)\b")
 DATE_PATTERN = re.compile(r"\b(\d{1,2}[\-/]?(\d{1,2}|jan|feb|mar|apr|mei|jun|jul|agu|sep|okt|nov|des)[\-/]?\d{2,4}|\bQ[1-4]\b|minggu|bulan|tahun)\b", re.IGNORECASE)
+
+# --------------------------- Segmentasi Dokumen ---------------------------
+def segment_document(text: str, requirement_names: List[str]) -> Dict[str, str]:
+    """
+    Membagi dokumen ke dalam segmen berdasarkan heading bab.
+    Heading diasumsikan berbentuk "1. Nama Bab" sesuai urutan REQUIREMENTS.
+    """
+    sections = {name: "" for name in requirement_names}
+
+    # Regex tangkap pola heading numerik, misalnya "1. Informasi Kegiatan"
+    heading_pattern = re.compile(r"^(\d+)\.\s*(.+)$", re.MULTILINE)
+    matches = list(heading_pattern.finditer(text))
+
+    for i, match in enumerate(matches):
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        section_text = text[start:end].strip()
+
+        # Normalisasi nama heading
+        heading = match.group(2).strip().lower()
+        for req in requirement_names:
+            if req.lower().split()[0] in heading:  # cocokkan kata pertama saja
+                sections[req] = section_text
+                break
+
+    return sections
 
 # --------------------------- Verifikasi Gambar ---------------------------
 def verify_image_with_text(page, keyword_patterns: List[str]) -> bool:
@@ -110,6 +133,12 @@ def verify_image_with_text(page, keyword_patterns: List[str]) -> bool:
     has_image = len(page.get_images(full=True)) > 0
 
     return has_image and has_keyword
+
+# --------------------------- Catatan ---------------------------
+# Dengan segmentasi ini, analisis keyword/gambar dilakukan hanya pada teks yang 
+# berada di bab sesuai urutan REQUIREMENTS. Jadi "m2" di bab 1 tidak lagi dianggap 
+# memenuhi syarat bab 7 Deskriptif Luasan.
+# ---------------------------
 
 # --------------------------- Catatan ---------------------------
 # Nanti di fungsi analisis utama, untuk persyaratan "Peta Lokasi" kita ganti pengecekan:
