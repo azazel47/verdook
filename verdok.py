@@ -85,12 +85,10 @@ REQUIREMENTS = [
 
 
 # --------------------------- Segmentasi Dokumen ---------------------------
-def segment_document(doc) -> (Dict[str, str], Dict[str, str]):
+def segment_document(doc) -> Dict[str, str]:
     sections = {r["name"]: "" for r in REQUIREMENTS}
-    headings = {r["name"]: "-" for r in REQUIREMENTS}  # simpan judul asli
     headings_found = []
-
-    numbering_pattern = r"^(\d+(\.\d+)*\.?|[ivxlcdm]+\.?|[a-zA-Z]\.)\s*"
+    headings = {}
 
     for page_num, page in enumerate(doc):
         blocks = page.get_text("dict")["blocks"]
@@ -99,25 +97,21 @@ def segment_document(doc) -> (Dict[str, str], Dict[str, str]):
                 continue
             for l in b["lines"]:
                 line_text = " ".join([s["text"] for s in l["spans"]]).strip()
-                is_bold = any(s.get("flags", 0) & 2 for s in l["spans"])
-                if not is_bold:
+                if not line_text:
                     continue
 
-                if not re.match(numbering_pattern, line_text, re.IGNORECASE):
-                    continue
-
-                clean_text = re.sub(numbering_pattern, "", line_text).lower()
+                clean_text = line_text.lower()
 
                 for req, aliases in SECTION_ALIASES.items():
                     for alias in aliases:
                         alias_lower = alias.lower()
-                        if clean_text.startswith(alias_lower):
-                            match_number = re.match(numbering_pattern, line_text).group(0)
-                            formatted_heading = f"{match_number}{line_text}"
-                            headings_found.append((req, page_num, l["bbox"], formatted_heading))
-                            headings[req] = formatted_heading
+                        # cari substring, bukan harus diawali
+                        if alias_lower in clean_text:
+                            headings_found.append((req, page_num, l["bbox"], line_text))
+                            headings[req] = line_text
                             break
 
+    # Segmentasi antar heading
     for i, (req, page_num, bbox, heading_text) in enumerate(headings_found):
         end_page, _ = (
             (headings_found[i+1][1], headings_found[i+1][2])
@@ -125,10 +119,12 @@ def segment_document(doc) -> (Dict[str, str], Dict[str, str]):
         )
         content_parts = []
         for p in range(page_num, end_page+1):
-            content_parts.append(doc[p].get_text("text"))
+            page = doc[p]
+            content_parts.append(page.get_text("text"))
         sections[req] = "\n".join(content_parts)
 
     return sections, headings
+
 
 
 # --------------------------- Ekstraksi PDF ---------------------------
