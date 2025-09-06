@@ -74,7 +74,7 @@ KEYWORDS = {
 
 # Alias untuk heading bab → requirement
 SECTION_ALIASES = {
-    "Informasi Kegiatan": ["informasi kegiatan", "rencana kegiatan"],
+    "Informasi Kegiatan": ["informasi kegiatan", "rencana kegiatan", "informasi pemohon"],
     "Tujuan": ["tujuan", "maksud"],
     "Manfaat": ["manfaat"],
     "Kegiatan Eksisting Yang Dimohonkan": ["kegiatan eksisting", "kegiatan eksisting yang dimohonkan", "usulan kegiatan"],
