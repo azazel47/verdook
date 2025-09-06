@@ -4,3 +4,4 @@ pdfplumber
 PyPDF2
 pandas
 numpy
+io
