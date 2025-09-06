@@ -37,7 +37,7 @@ KEYWORDS = {
     "Informasi Kegiatan": [
         r"informasi\s+kegiatan", r"deskripsi\s+kegiatan", r"gambaran\s+umum",
         r"kegiatan", r"uraian\s+kegiatan", r"rincian\s+kegiatan", r"gambaran\s+kegiatan",
-        r"profil\s+kegiatan", r"latar\s+belakang\s+kegiatan", r"ringkasan\s+kegiatan"
+        r"profil\s+kegiatan", r"latar\s+belakang\s+kegiatan", r"ringkasan\s+kegiatan", r"rencana\s+kegiatan"
     ],
     "Tujuan": [
         r"tujuan", r"maksud", r"sasaran", r"target", r"orientasi", r"objective",
