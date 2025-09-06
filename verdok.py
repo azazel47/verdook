@@ -184,8 +184,6 @@ def analyze_pdf(file_bytes: bytes) -> Dict:
             "Ditemukan Teks": "✅" if found_text else "❌",
             "Ada Gambar/Tabel (Jika Wajib)": "✅" if (visual_ok and table_ok) else "❌" if (req["requires_visual"] or req["requires_table"]) else "N/A",
             "Status": "✅ LENGKAP" if status else "❌ BELUM LENGKAP",
-            "Catatan": "; ".join(notes) if notes else "",
-            "Halaman Bukti (perkiraan)": "-",  # opsional: bisa ditambahkan jika perlu mapping page
         })
 
     total_req = len(results)
