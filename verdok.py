@@ -1,4 +1,3 @@
-kedua
 # streamlit_dashboard_kelengkapan_perizinan.py
 # --------------------------------------------------------------
 # Jalankan dengan:
