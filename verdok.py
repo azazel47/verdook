@@ -34,30 +34,69 @@ except Exception:
 
 # --------------------------- Util Helpers ---------------------------
 KEYWORDS = {
-    "Informasi Kegiatan": [r"informasi\s+kegiatan", r"deskripsi\s+kegiatan", r"gambaran\s+umum"],
-    "Tujuan": [r"tujuan", r"purpose"],
-    "Manfaat": [r"manfaat", r"benefit"],
-    "Kegiatan Eksisting Yang Dimohonkan": [r"kegiatan\s+eksisting", r"yang\s+dimohonkan", r"existing\s+activity"],
-    "Jadwal Pelaksanaan Kegiatan": [r"jadwal", r"timeline", r"rencana\s+pelaksanaan", r"tahapan"],
-    "Rencana Tapak/Siteplan": [r"site\s*plan|siteplan", r"rencana\s+tapak", r"denah"],
-    "Deskriptif luasan yang dibutuhkan": [r"luas(?:an)?", r"meter\s*persegi|m2|m\^2|m²", r"dimensi", r"ukuran"],
-    "Peta Lokasi": [r"peta\s+lokasi", r"lokasi", r"map", r"koordinat"],
+    "Informasi Kegiatan": [
+        r"informasi\s+kegiatan", r"deskripsi\s+kegiatan", r"gambaran\s+umum",
+        r"kegiatan", r"uraian\s+kegiatan", r"rincian\s+kegiatan", r"gambaran\s+kegiatan",
+        r"profil\s+kegiatan", r"deskripsi\s+kegiatan", r"latar\s+belakang\s+kegiatan",
+        r"ringkasan\s+kegiatan"
+    ],
+    "Tujuan": [
+        r"tujuan", r"maksud", r"sasaran", r"target", r"orientasi", r"objective", r"goal",
+        r"visi", r"misi"
+    ],
+    "Manfaat": [
+        r"manfaat", r"kegunaan", r"dampak\s+positif", r"hasil\s+yang\s+diharapkan",
+        r"outcome", r"nilai\s+Tambah", r"keuntungan", r"faedah", r"benefit"
+    ],
+    "Kegiatan Eksisting Yang Dimohonkan": [
+        r"kegiatan\s+eksisting", r"yang\s+dimohonkan", r"existing\s+activity",
+        r"aktivitas\s+yang\s+sedang\s+berjalan", r"program\s+berjalan", r"kondisi\s+eksisting",
+        r"rencana\s+kegiatan", r"usulan\s+kegiatan", r"proposal\s+kegiatan",
+        r"permohonan\s+kegiatan", r"aktivitas\s+yang\s+diusulkan"
+    ],
+    "Jadwal Pelaksanaan Kegiatan": [
+        r"jadwal", r"timeline", r"rencana\s+pelaksanaan", r"tahapan",
+        r"rencana\s+waktu", r"schedule", r"perencanaan\s+waktu", r"timeframe",
+        r"tahapan\s+pelaksanaan", r"roadmap", r"matriks\s+waktu"
+    ],
+    "Rencana Tapak/Siteplan": [
+        r"site\s*plan|siteplan", r"rencana\s+tapak", r"denah", r"denah\s+tapak",
+        r"gambar\s+tapak", r"layout", r"tata\s+letak", r"masterplan",
+        r"sketsa\s+lokasi", r"peta\s+tapak", r"diagram\s+site"
+    ],
+    "Deskriptif luasan yang dibutuhkan": [
+        r"luas(?:an)?", r"meter\s*persegi|m2|m\^2|m²|ha|hektar|hektare",
+        r"dimensi", r"ukuran", r"kebutuhan\s+luas", r"estimasi\s+luas",
+        r"spesifikasi\s+luasan", r"ukuran\s+area", r"kebutuhan\s+lahan",
+        r"luas\s+lahan", r"rincian\s+area", r"kapasitas\s+ruang"
+    ],
+    "Peta Lokasi": [
+        r"peta\s+lokasi", r"lokasi", r"map", r"koordinat",
+        r"denah\s+lokasi", r"gambar\s+lokasi", r"lokasi\s+proyek",
+        r"posisi\s+geografis", r"koordinat\s+lokasi", r"lokasi\s+tapak",
+        r"sketsa\s+lokasi"
+    ],
 }
 
+# Aturan:
+# - Rencana Tapak/Siteplan → wajib ada gambar
+# - Peta Lokasi → wajib ada gambar
+# - Jadwal Pelaksanaan Kegiatan → wajib ada gambar ATAU tabel
 REQUIREMENTS = [
     {"name": "Informasi Kegiatan", "requires_visual": False, "requires_table": False},
     {"name": "Tujuan", "requires_visual": False, "requires_table": False},
     {"name": "Manfaat", "requires_visual": False, "requires_table": False},
     {"name": "Kegiatan Eksisting Yang Dimohonkan", "requires_visual": False, "requires_table": False},
-    {"name": "Jadwal Pelaksanaan Kegiatan", "requires_visual": True, "requires_table": True},  # visual ATAU tabel
+    {"name": "Jadwal Pelaksanaan Kegiatan", "requires_visual": True, "requires_table": True},  # salah satu wajib
     {"name": "Rencana Tapak/Siteplan", "requires_visual": True, "requires_table": False},
     {"name": "Deskriptif luasan yang dibutuhkan", "requires_visual": False, "requires_table": False},
     {"name": "Peta Lokasi", "requires_visual": True, "requires_table": False},
 ]
 
-NUMBER_PATTERN = re.compile(r"(?<!\d)(?:[1-9]\d{0,2}(?:\.\d{3})*|0)?(?:[\.,]\d+)?\s*(?:m2|m\^2|m²|meter\s*persegi|m|meter)\b")
+NUMBER_PATTERN = re.compile(r"(?<!\d)(?:[1-9]\d{0,2}(?:\.\d{3})*|0)?(?:[\.,]\d+)?\s*(?:m2|m\^2|m²|ha|hektar|hektare|meter\s*persegi|m|meter)\b")
 DATE_PATTERN = re.compile(r"\b(\d{1,2}[\-/]?(\d{1,2}|jan|feb|mar|apr|mei|jun|jul|agu|sep|okt|nov|des)[\-/]?\d{2,4}|\bQ[1-4]\b|minggu|bulan|tahun)\b", re.IGNORECASE)
 
+# (sisanya tetap sama seperti versi sebelumnya: fungsi ekstraksi, analisis, UI)
 
 def clean_text(t: str) -> str:
     t = t or ""
