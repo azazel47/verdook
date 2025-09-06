@@ -1,9 +1,3 @@
-# streamlit_dashboard_kelengkapan_perizinan.py
-# --------------------------------------------------------------
-# Jalankan dengan:
-#    streamlit run streamlit_dashboard_kelengkapan_perizinan.py
-# --------------------------------------------------------------
-
 import io
 import re
 from typing import Dict, List, Tuple
@@ -28,59 +22,25 @@ except Exception:
 
 # --------------------------- Keyword Persyaratan ---------------------------
 KEYWORDS = {
-    "Informasi Kegiatan": [
-        r"informasi\s+kegiatan", r"rencana\s+kegiatan", r"uraian\s+kegiatan",
-        r"rincian\s+kegiatan", r"gambaran\s+kegiatan", r"profil\s+kegiatan",
-        r"deskripsi\s+kegiatan", r"latar\s+belakang\s+kegiatan", r"ringkasan\s+kegiatan"
-        r"ruang\s+laut", r"kegiatan\s+utama"
-    ],
-    "Tujuan": [
-        r"tujuan", r"maksud", r"sasaran", r"target", r"orientasi",
-        r"objective", r"goal", r"visi", r"misi"
-    ],
-    "Manfaat": [
-        r"manfaat", r"kegunaan", r"dampak\s+positif", r"hasil\s+yang\s+diharapkan",
-        r"outcome", r"nilai\s+Tambah", r"keuntungan", r"faedah", r"benefit"
-    ],
-    "Kegiatan Eksisting Yang Dimohonkan": [
-        r"kegiatan\s+eksisting", r"kegiatan\s+eksisting\s+yang\s+dimohonkan",
-        r"aktivitas\s+yang\s+sedang\s+berjalan",
-        r"program\s+berjalan", r"kondisi\s+eksisting", r"rencana\s+kegiatan",
-        r"usulan\s+kegiatan", r"proposal\s+kegiatan", r"permohonan\s+kegiatan",
-        r"aktivitas\s+yang\s+diusulkan", r"pembangunan", r"fasilitas"
-    ],
-    "Jadwal Pelaksanaan Kegiatan": [
-        r"jadwal", r"timeline", r"rencana\s+waktu", r"schedule", r"perencanaan\s+waktu",
-        r"timeframe", r"tahapan\s+pelaksanaan", r"roadmap", r"matriks\s+waktu"
-    ],
-    "Rencana Tapak/Siteplan": [
-        r"site\s*plan|siteplan", r"rencana\s+tapak", r"denah", r"denah\s+tapak",
-        r"gambar\s+tapak", r"layout", r"tata\s+letak", r"masterplan",
-        r"sketsa\s+lokasi", r"peta\s+tapak", r"diagram\s+site"
-    ],
-    "Deskriptif Luasan yang Dibutuhkan": [
-        r"luas(?:an)?", r"meter\s*persegi|m2|m\^2|m²|ha|hektar|hektare",
-        r"dimensi", r"ukuran", r"kebutuhan\s+luas", r"estimasi\s+luas",
-        r"spesifikasi\s+luasan", r"ukuran\s+area", r"kebutuhan\s+lahan",
-        r"luas\s+lahan", r"rincian\s+area", r"kapasitas\s+ruang"
-    ],
-    "Peta Lokasi": [
-        r"peta\s+lokasi", r"denah\s+lokasi", r"gambar\s+lokasi",
-        r"lokasi\s+proyek", r"map", r"posisi\s+geografis",
-        r"koordinat\s+lokasi", r"lokasi\s+tapak", r"sketsa\s+lokasi"
-    ],
+    "Informasi Kegiatan": [r"informasi\s+kegiatan", r"rencana\s+kegiatan", r"uraian\s+kegiatan"],
+    "Tujuan": [r"tujuan", r"maksud", r"sasaran"],
+    "Manfaat": [r"manfaat", r"kegunaan", r"benefit"],
+    "Kegiatan Eksisting Yang Dimohonkan": [r"kegiatan\s+eksisting", r"usulan\s+kegiatan", r"permohonan\s+kegiatan"],
+    "Jadwal Pelaksanaan Kegiatan": [r"jadwal", r"timeline", r"schedule"],
+    "Rencana Tapak/Siteplan": [r"site\s*plan", r"rencana\s+tapak", r"denah"],
+    "Deskriptif Luasan yang Dibutuhkan": [r"luas", r"m2", r"hektar", r"meter\s*persegi"],
+    "Peta Lokasi": [r"peta\s+lokasi", r"denah\s+lokasi", r"koordinat\s+lokasi"]
 }
 
-# Alias untuk heading bab → requirement
 SECTION_ALIASES = {
     "Informasi Kegiatan": ["informasi kegiatan", "rencana kegiatan"],
     "Tujuan": ["tujuan", "maksud"],
     "Manfaat": ["manfaat"],
-    "Kegiatan Eksisting Yang Dimohonkan": ["kegiatan eksisting", "kegiatan eksisting yang dimohonkan", "usulan kegiatan"],
+    "Kegiatan Eksisting Yang Dimohonkan": ["kegiatan eksisting", "usulan kegiatan"],
     "Jadwal Pelaksanaan Kegiatan": ["jadwal", "timeline"],
     "Rencana Tapak/Siteplan": ["siteplan", "rencana tapak", "denah"],
     "Deskriptif Luasan yang Dibutuhkan": ["luasan", "luas", "kebutuhan lahan"],
-    "Peta Lokasi": ["peta lokasi", "denah lokasi", "lokasi kegiatan"],
+    "Peta Lokasi": ["peta lokasi", "denah lokasi", "lokasi kegiatan"]
 }
 
 REQUIREMENTS = [
@@ -91,54 +51,48 @@ REQUIREMENTS = [
     {"name": "Jadwal Pelaksanaan Kegiatan", "requires_visual": True, "requires_table": True},
     {"name": "Rencana Tapak/Siteplan", "requires_visual": True, "requires_table": False},
     {"name": "Deskriptif Luasan yang Dibutuhkan", "requires_visual": False, "requires_table": False},
-    {"name": "Peta Lokasi", "requires_visual": True, "requires_table": False},
+    {"name": "Peta Lokasi", "requires_visual": True, "requires_table": False}
 ]
 
-NUMBER_PATTERN = re.compile(r"(?<!\d)(?:[1-9]\d{0,2}(?:\.\d{3})*|0)?(?:[\.,]\d+)?\s*(?:m2|m\^2|m²|ha|hektar|hektare|meter\s*persegi)\b")
-DATE_PATTERN = re.compile(r"\b(\d{1,2}[\-/]?\d{1,2}[\-/]?\d{2,4}|\bQ[1-4]\b|minggu|bulan|tahun)\b", re.IGNORECASE)
-
 # --------------------------- Segmentasi Dokumen ---------------------------
-def segment_document(text: str) -> Dict[str, str]:
+def segment_document(text: str, doc) -> Dict[str, str]:
     sections = {r["name"]: "" for r in REQUIREMENTS}
-    heading_pattern = re.compile(
-        r"^(?:\d+(?:\.\d+)*|[A-Z]\.|[A-Z][A-Z\s]{2,})\s+(.+)$",
-        re.MULTILINE,
-    )
+    headings_found = []
 
-    matches = list(heading_pattern.finditer(text))
-    for i, match in enumerate(matches):
-        start = match.end()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-        section_text = text[start:end].strip()
+    # Loop setiap halaman untuk mendeteksi heading bold
+    for page_num, page in enumerate(doc):
+        blocks = page.get_text("dict")["blocks"]
+        for b in blocks:
+            if "lines" not in b:
+                continue
+            for l in b["lines"]:
+                for s in l["spans"]:
+                    if s.get("flags", 0) & 2:  # flag 2 biasanya = bold
+                        heading_text = s["text"].strip().lower()
+                        for req, aliases in SECTION_ALIASES.items():
+                            if any(alias in heading_text for alias in aliases):
+                                headings_found.append((req, page_num, s["bbox"]))
 
-        heading = match.group(1).strip().lower()
-
-        # hanya mapping jika heading cocok dengan alias salah satu requirement
-        mapped = False
-        for req, aliases in SECTION_ALIASES.items():
-            if any(alias in heading for alias in aliases):
-                sections[req] = section_text
-                mapped = True
-                break
-
-        # jika heading tidak dikenali aliasnya → abaikan saja
-        if not mapped:
-            continue
+    # Buat segmentasi dari heading -> heading berikutnya
+    for i, (req, page_num, bbox) in enumerate(headings_found):
+        end_page, end_bbox = (headings_found[i+1][1], headings_found[i+1][2]) if i+1 < len(headings_found) else (len(doc)-1, None)
+        content_parts = []
+        for p in range(page_num, end_page+1):
+            page = doc[p]
+            page_text = page.get_text("text")
+            content_parts.append(page_text)
+        sections[req] = "\n".join(content_parts)
 
     return sections
 
-
 # --------------------------- Ekstraksi PDF ---------------------------
-def extract_with_pymupdf(file_bytes: bytes) -> Tuple[List[str], Dict[int, int]]:
-    text_pages = []
-    images_per_page = {}
+def extract_with_pymupdf(file_bytes: bytes):
     if fitz is None:
-        return text_pages, images_per_page
+        return None, [], {}
     doc = fitz.open(stream=file_bytes, filetype="pdf")
-    for i, page in enumerate(doc):
-        text_pages.append(page.get_text("text") or "")
-        images_per_page[i] = len(page.get_images(full=True))
-    return text_pages, images_per_page
+    text_pages = [p.get_text("text") or "" for p in doc]
+    images_per_page = {i: len(p.get_images(full=True)) for i, p in enumerate(doc)}
+    return doc, text_pages, images_per_page
 
 def extract_with_pypdf2(file_bytes: bytes) -> List[str]:
     text_pages = []
@@ -167,13 +121,16 @@ def detect_tables_with_pdfplumber(file_bytes: bytes) -> Dict[int, int]:
 
 # --------------------------- Analisis ---------------------------
 def analyze_pdf(file_bytes: bytes) -> Dict:
-    text_pages, images_per_page = extract_with_pymupdf(file_bytes)
-    if not text_pages:
+    doc, text_pages, images_per_page = extract_with_pymupdf(file_bytes)
+    if doc is None:
         text_pages = extract_with_pypdf2(file_bytes)
+        images_per_page = {}
+        return {"results": [], "stats": {}}
+
     table_counts = detect_tables_with_pdfplumber(file_bytes)
 
     full_text = "\n".join(text_pages).lower()
-    segmented = segment_document(full_text)
+    segmented = segment_document(full_text, doc)
 
     results = []
     for req in REQUIREMENTS:
@@ -182,16 +139,14 @@ def analyze_pdf(file_bytes: bytes) -> Dict:
         found_text = any(re.search(p, segment_text) for p in KEYWORDS.get(name, []))
 
         visual_ok, table_ok, notes = True, True, []
-        if req["requires_visual"]:
-            if sum(images_per_page.values()) == 0:
-                visual_ok = False
-                notes.append("Wajib menyertakan gambar pada bab ini.")
-        if req["requires_table"]:
-            if sum(table_counts.values()) == 0:
-                table_ok = False
-                notes.append("Wajib menyertakan tabel pada bab ini.")
+        if req["requires_visual"] and sum(images_per_page.values()) == 0:
+            visual_ok = False
+            notes.append("Wajib menyertakan gambar.")
+        if req["requires_table"] and sum(table_counts.values()) == 0:
+            table_ok = False
+            notes.append("Wajib menyertakan tabel.")
         if not found_text:
-            notes.append("Kata kunci terkait belum ditemukan.")
+            notes.append("Kata kunci tidak ditemukan.")
 
         status = found_text and visual_ok and table_ok
         results.append({
