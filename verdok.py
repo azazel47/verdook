@@ -63,7 +63,7 @@ KEYWORDS = {
 
 SECTION_ALIASES = {
     "Informasi Pemohon": ["informasi kegiatan", "rencana kegiatan", "informasi pemohon"],
-    "Tujuan": ["tujuan", r"\bmaksud\b"],
+    "Tujuan": [r"\btujuan\b","tujuan kegiatan", r"\bmaksud\b"],
     "Manfaat": [r"\bmanfaat\b", "manfaat kegiatan"],
     "Kegiatan Eksisting Yang Dimohonkan": ["kegiatan eksisting", "usulan kegiatan"],
     "Jadwal Pelaksanaan Kegiatan": ["jadwal", "timeline"],
