@@ -1,3 +1,4 @@
+kedua
 # streamlit_dashboard_kelengkapan_perizinan.py
 # --------------------------------------------------------------
 # Jalankan dengan:
@@ -31,23 +32,22 @@ KEYWORDS = {
     "Informasi Kegiatan": [
         r"informasi\s+kegiatan", r"rencana\s+kegiatan", r"uraian\s+kegiatan",
         r"rincian\s+kegiatan", r"gambaran\s+kegiatan", r"profil\s+kegiatan",
-        r"deskripsi\s+kegiatan", r"latar\s+belakang\s+kegiatan", r"ringkasan\s+kegiatan",
-        r"ruang\s+laut", r"kegiatan\s+utama"
+        r"deskripsi\s+kegiatan", r"latar\s+belakang\s+kegiatan", r"ringkasan\s+kegiatan"
+        r"ruang\s+laut"
     ],
     "Tujuan": [
         r"tujuan", r"maksud", r"sasaran", r"target", r"orientasi",
-        r"objective", r"goal", r"visi", r"misi", r"diharapkan", r"untuk"
+        r"objective", r"goal", r"visi", r"misi"
     ],
     "Manfaat": [
         r"manfaat", r"kegunaan", r"dampak\s+positif", r"hasil\s+yang\s+diharapkan",
-        r"outcome", r"nilai\s+Tambah", r"keuntungan", r"faedah", r"benefit",
-        r"meningkatkan", r"menambah", r"mendorong"
+        r"outcome", r"nilai\s+Tambah", r"keuntungan", r"faedah", r"benefit"
     ],
     "Kegiatan Eksisting Yang Dimohonkan": [
         r"kegiatan\s+eksisting", r"kegiatan\s+eksisting\s+yang\s+dimohonkan",
         r"aktivitas\s+yang\s+sedang\s+berjalan",
-        r"program\s+berjalan", r"kondisi\s+eksisting", r"usulan\s+kegiatan",
-        r"proposal\s+kegiatan", r"permohonan\s+kegiatan",
+        r"program\s+berjalan", r"kondisi\s+eksisting", r"rencana\s+kegiatan",
+        r"usulan\s+kegiatan", r"proposal\s+kegiatan", r"permohonan\s+kegiatan",
         r"aktivitas\s+yang\s+diusulkan", r"pembangunan", r"fasilitas"
     ],
     "Jadwal Pelaksanaan Kegiatan": [
@@ -66,21 +66,21 @@ KEYWORDS = {
         r"luas\s+lahan", r"rincian\s+area", r"kapasitas\s+ruang"
     ],
     "Peta Lokasi": [
-        r"peta\s+lokasi", r"peta", r"denah\s+lokasi", r"gambar\s+lokasi",
+        r"peta\s+lokasi", r"denah\s+lokasi", r"gambar\s+lokasi",
         r"lokasi\s+proyek", r"map", r"posisi\s+geografis",
-        r"koordinat\s+lokasi", r"lokasi\s+tapak", r"sketsa\s+lokasi", r"legenda"
+        r"koordinat\s+lokasi", r"lokasi\s+tapak", r"sketsa\s+lokasi"
     ],
 }
 
 # Alias untuk heading bab → requirement
 SECTION_ALIASES = {
-    "Informasi Kegiatan": ["informasi kegiatan", "rencana kegiatan", "informasi pemohon"],
+    "Informasi Kegiatan": ["informasi kegiatan", "rencana kegiatan"],
     "Tujuan": ["tujuan", "maksud"],
     "Manfaat": ["manfaat"],
     "Kegiatan Eksisting Yang Dimohonkan": ["kegiatan eksisting", "kegiatan eksisting yang dimohonkan", "usulan kegiatan"],
-    "Jadwal Pelaksanaan Kegiatan": ["jadwal", "timeline", "rencana jadwal"],
+    "Jadwal Pelaksanaan Kegiatan": ["jadwal", "timeline"],
     "Rencana Tapak/Siteplan": ["siteplan", "rencana tapak", "denah"],
-    "Deskriptif Luasan yang Dibutuhkan": ["deskriptif luasan", "deskripsi luasan", "luasan", "luas yang dibutuhkan"],
+    "Deskriptif Luasan yang Dibutuhkan": ["luasan", "luas", "kebutuhan lahan"],
     "Peta Lokasi": ["peta lokasi", "denah lokasi", "lokasi kegiatan"],
 }
 
@@ -101,7 +101,7 @@ DATE_PATTERN = re.compile(r"\b(\d{1,2}[\-/]?\d{1,2}[\-/]?\d{2,4}|\bQ[1-4]\b|ming
 # --------------------------- Segmentasi Dokumen ---------------------------
 def segment_document(text: str) -> Dict[str, str]:
     sections = {r["name"]: "" for r in REQUIREMENTS}
-    heading_pattern = re.compile(r"^(?:\d+\.|[A-Z]\.|[A-Z]\s+|[A-Z]{2,})\s*(.+)$", re.MULTILINE)
+    heading_pattern = re.compile(r"^(?:\d+(?:\.\d+)*|[A-Z]|)[\.\)]?\s+([A-Za-z].+)$", re.MULTILINE)
 
     matches = list(heading_pattern.finditer(text))
     for i, match in enumerate(matches):
@@ -110,14 +110,10 @@ def segment_document(text: str) -> Dict[str, str]:
         section_text = text[start:end].strip()
 
         heading = match.group(1).strip().lower()
-
-        # hanya mapping jika heading cocok dengan alias salah satu requirement
         for req, aliases in SECTION_ALIASES.items():
             if any(alias in heading for alias in aliases):
                 sections[req] = section_text
                 break
-        # kalau heading tidak dikenali aliasnya → abaikan saja (tidak isi requirement)
-
     return sections
 
 # --------------------------- Ekstraksi PDF ---------------------------
@@ -173,14 +169,13 @@ def analyze_pdf(file_bytes: bytes) -> Dict:
         segment_text = segmented.get(name, "")
         found_text = any(re.search(p, segment_text) for p in KEYWORDS.get(name, []))
 
-        # fallback: deteksi gambar/tabel dari teks (jika extractor gagal)
         visual_ok, table_ok, notes = True, True, []
         if req["requires_visual"]:
-            if sum(images_per_page.values()) == 0 and "gambar" not in segment_text:
+            if sum(images_per_page.values()) == 0:
                 visual_ok = False
                 notes.append("Wajib menyertakan gambar pada bab ini.")
         if req["requires_table"]:
-            if sum(table_counts.values()) == 0 and "tabel" not in segment_text:
+            if sum(table_counts.values()) == 0:
                 table_ok = False
                 notes.append("Wajib menyertakan tabel pada bab ini.")
         if not found_text:
