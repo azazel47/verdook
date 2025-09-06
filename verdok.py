@@ -108,7 +108,7 @@ def segment_document(text: str) -> Dict[str, str]:
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         section_text = text[start:end].strip()
 
-        heading = match.group(2).strip().lower()
+        heading = match.group(1).strip().lower()
         for req, aliases in SECTION_ALIASES.items():
             if any(alias in heading for alias in aliases):
                 sections[req] = section_text
