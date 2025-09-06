@@ -75,7 +75,7 @@ SECTION_ALIASES = {
     "Informasi Kegiatan": ["informasi kegiatan", "rencana kegiatan"],
     "Tujuan": ["tujuan", "maksud"],
     "Manfaat": ["manfaat"],
-    "Kegiatan Eksisting Yang Dimohonkan": ["kegiatan eksisting", "usulan kegiatan"],
+    "Kegiatan Eksisting Yang Dimohonkan": ["kegiatan eksisting", "kegiatan eksisting yang dimohonkan", "usulan kegiatan"],
     "Jadwal Pelaksanaan Kegiatan": ["jadwal", "timeline"],
     "Rencana Tapak/Siteplan": ["siteplan", "rencana tapak", "denah"],
     "Deskriptif Luasan yang Dibutuhkan": ["luasan", "luas", "kebutuhan lahan"],
