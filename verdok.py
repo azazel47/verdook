@@ -49,7 +49,7 @@ REQUIREMENTS = [
     {"name": "Tujuan", "requires_visual": False, "requires_table": False},
     {"name": "Manfaat", "requires_visual": False, "requires_table": False},
     {"name": "Kegiatan Eksisting Yang Dimohonkan", "requires_visual": False, "requires_table": False},
-    {"name": "Jadwal Pelaksanaan Kegiatan", "requires_visual": True, "requires_table": True},  # visual ATAU tabel pada halaman yang relevan diutamakan
+    {"name": "Jadwal Pelaksanaan Kegiatan", "requires_visual": True, "requires_table": True},  # visual ATAU tabel
     {"name": "Rencana Tapak/Siteplan", "requires_visual": True, "requires_table": False},
     {"name": "Deskriptif luasan yang dibutuhkan", "requires_visual": False, "requires_table": False},
     {"name": "Peta Lokasi", "requires_visual": True, "requires_table": False},
@@ -66,7 +66,6 @@ def clean_text(t: str) -> str:
 
 
 def find_keyword_hits(text_pages: List[str], patterns: List[str]) -> Dict[int, List[str]]:
-    """Return dict: page_index -> [matched_keywords]"""
     hits = {}
     for i, page_text in enumerate(text_pages):
         low = page_text.lower()
@@ -80,7 +79,6 @@ def find_keyword_hits(text_pages: List[str], patterns: List[str]) -> Dict[int, L
 
 
 def extract_with_pymupdf(file_bytes: bytes) -> Tuple[List[str], Dict[int, int]]:
-    """Extract text per page and count images per page using PyMuPDF (if available)."""
     text_pages = []
     images_per_page = {}
     if fitz is None:
@@ -106,7 +104,6 @@ def extract_with_pypdf2(file_bytes: bytes) -> List[str]:
 
 
 def detect_tables_with_pdfplumber(file_bytes: bytes) -> Dict[int, int]:
-    """Return dict page_index -> table_count (best-effort)."""
     table_counts = {}
     if pdfplumber is None:
         return table_counts
@@ -125,14 +122,12 @@ def score_requirement(name: str,
                       images_per_page: Dict[int, int],
                       table_counts: Dict[int, int],
                       text_pages: List[str]) -> Dict:
-    """Evaluate each requirement and return a standardized result row."""
     requires_visual = next(r for r in REQUIREMENTS if r["name"] == name)["requires_visual"]
     requires_table = next(r for r in REQUIREMENTS if r["name"] == name)["requires_table"]
 
     found_text = len(keyword_hits) > 0
     pages_with_text = sorted(keyword_hits.keys())
 
-    # Visual/table checks prefer same page as keyword if available
     def _sum_counts(indices: List[int], mapping: Dict[int, int]):
         return sum(mapping.get(i, 0) for i in indices)
 
@@ -145,12 +140,10 @@ def score_requirement(name: str,
     visual_ok = (visual_on_same > 0) or (not pages_with_text and any_visual > 0) if requires_visual else True
     table_ok = (tables_on_same > 0) or (not pages_with_text and any_table > 0) if requires_table else True
 
-    # Extra suitability heuristics per requirement
     notes = []
     evidence_pages = pages_with_text[:3]
 
     if name == "Deskriptif luasan yang dibutuhkan":
-        # Look for numeric area mentions
         area_hits = {}
         for i, t in enumerate(text_pages):
             if re.search(NUMBER_PATTERN, t.lower()):
@@ -161,7 +154,6 @@ def score_requirement(name: str,
             notes.append("Tidak ditemukan angka + satuan (m²/m2/meter persegi).")
 
     if name == "Jadwal Pelaksanaan Kegiatan":
-        # Look for dates/quarters/time words
         got_dateword = False
         for i in pages_with_text:
             if re.search(DATE_PATTERN, text_pages[i].lower()):
@@ -190,20 +182,12 @@ def score_requirement(name: str,
 
 
 def analyze_pdf(file_bytes: bytes) -> Dict:
-    # Extract text & images
     text_pages, images_per_page = extract_with_pymupdf(file_bytes)
-
-    # Fallback text extraction
     if not text_pages:
         text_pages = extract_with_pypdf2(file_bytes)
-
-    # Table detection
     table_counts = detect_tables_with_pdfplumber(file_bytes)
-
-    # Normalize
     text_pages = [clean_text(t) for t in text_pages]
 
-    # Keyword hits per requirement
     results = []
     for req in REQUIREMENTS:
         name = req["name"]
@@ -212,12 +196,10 @@ def analyze_pdf(file_bytes: bytes) -> Dict:
         row = score_requirement(name, hits, images_per_page, table_counts, text_pages)
         results.append(row)
 
-    # Totals
     total_req = len(results)
     total_ok = sum(1 for r in results if r["Status"].startswith("✅"))
     completeness = round((total_ok / total_req) * 100, 1) if total_req else 0.0
 
-    # Document stats
     n_pages = max(len(text_pages), max(images_per_page.keys(), default=-1) + 1, max(table_counts.keys(), default=-1) + 1)
     n_images = sum(images_per_page.values()) if images_per_page else 0
     n_tables = sum(table_counts.values()) if table_counts else 0
@@ -259,7 +241,6 @@ if uploaded is None:
     st.info("Silakan unggah file PDF untuk mulai analisis.")
     st.stop()
 
-# Read bytes once
 file_bytes = uploaded.read()
 
 with st.spinner("Menganalisis dokumen..."):
@@ -269,7 +250,6 @@ with st.spinner("Menganalisis dokumen..."):
         st.error(f"Gagal menganalisis PDF: {e}")
         st.stop()
 
-# ----- Summary Metrics -----
 st.subheader("Ringkasan Dokumen")
 col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("Halaman", output["stats"].get("Jumlah Halaman", 0))
@@ -278,11 +258,9 @@ col3.metric("Gambar", output["stats"].get("Jumlah Gambar (terdeteksi)", 0))
 col4.metric("Tabel", output["stats"].get("Jumlah Tabel (terdeteksi)", 0))
 col5.metric("Kelengkapan", f"{output['stats'].get('Kompleteness %', 0.0)}%")
 
-# ----- Checklist Table -----
 st.subheader("Checklist Kelengkapan & Kesesuaian")
 df = pd.DataFrame(output["results"]) 
 
-# Styling for quick glance
 status_colors = {"✅ LENGKAP": "#22c55e", "❌ BELUM LENGKAP": "#ef4444"}
 
 def style_df(d: pd.DataFrame):
@@ -295,21 +273,29 @@ def style_df(d: pd.DataFrame):
 
 st.dataframe(style_df(df), use_container_width=True, hide_index=True)
 
-# ----- Per-item Checklist (visual) -----
 st.subheader("Tinjauan Per Persyaratan")
-for _, row in df.iterrows():
+for idx, row in df.iterrows():
     ok = row["Status"].startswith("✅")
     with st.expander(f"{row['Persyaratan']} — {'✅' if ok else '❌'}"):
         c1, c2, c3 = st.columns([2, 2, 3])
-        c1.checkbox("Teks terkait ditemukan", value=(row["Ditemukan Teks"] == "✅"), disabled=True)
+        c1.checkbox(
+            "Teks terkait ditemukan",
+            value=(row["Ditemukan Teks"] == "✅"),
+            disabled=True,
+            key=f"text_{idx}_{row['Persyaratan']}"
+        )
         req_visual_table = row["Ada Gambar/Tabel (Jika Wajib)"]
-        c2.checkbox("Gambar/Tabel sesuai (jika wajib)", value=(req_visual_table == "✅"), disabled=True)
+        c2.checkbox(
+            "Gambar/Tabel sesuai (jika wajib)",
+            value=(req_visual_table == "✅"),
+            disabled=True,
+            key=f"visual_{idx}_{row['Persyaratan']}"
+        )
         c3.markdown(f"**Status:** {row['Status']}  ")
         if row["Catatan"]:
             st.warning(row["Catatan"])
         st.caption(f"Halaman bukti (perkiraan): {row['Halaman Bukti (perkiraan, 1-based)']}")
 
-# ----- Export -----
 st.subheader("Ekspor Hasil")
 report = {
     "metadata": {
